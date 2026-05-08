@@ -533,23 +533,79 @@ function autoSchedule(body) {
 
   const rainThreshold = Number(race.rain_threshold_pct) || 10;
 
-  // Estado por piloto: { lastStintEnd (minutos desde meia-noite), totalMinutes, stintCount }
+  // Estado por piloto
+  // continuousMinutes: minutos no stint atual (reset ao parar)
+  // prevStintMinutes:  duração do stint que acabou de terminar (para checar se precisa descanso)
+  // lastSlotNumber:    último slot que dirigiu (para detectar slots consecutivos)
+  // lastSlotEndMin:    horário (minutos) que terminou o último slot
+  // totalMinutes:      tempo total acumulado na corrida
+  // stintCount:        quantos stints completos fez
   const driverState = {};
+  function getState(name) {
+    if (!driverState[name]) driverState[name] = {
+      continuousMinutes: 0, prevStintMinutes: 0,
+      lastSlotNumber: null, lastSlotEndMin: null,
+      totalMinutes: 0, stintCount: 0,
+    };
+    return driverState[name];
+  }
+
+  // Quem está no carro agora por equipe
+  const teamCurrentDriver = {};
 
   const schedule = [];
-
   const sortedSlots = timeslots.slice().sort((a, b) => Number(a.slot_number) - Number(b.slot_number));
 
+  // Verifica se piloto está disponível neste slot (slots_csv ou fallback)
+  function isAvailableInSlot(driverName, slot, slotStartMin, slotEndMin) {
+    const avail = getLatestAvailability(driverName, availability);
+    if (!avail) return false;
+    const slotsCsv = String(avail.slots_csv || '').trim();
+    if (slotsCsv) {
+      const selected = slotsCsv.split(',').map(s => Number(s.trim())).filter(Boolean);
+      return selected.includes(Number(slot.slot_number));
+    }
+    const fromSlot = Number(avail.slot_from) || 0;
+    const toSlot   = Number(avail.slot_to)   || 0;
+    if (fromSlot > 0 && toSlot > 0) {
+      return Number(slot.slot_number) >= fromSlot && Number(slot.slot_number) <= toSlot;
+    }
+    return timeRangeContains(timeToMinutes(avail.available_from), timeToMinutes(avail.available_to), slotStartMin, slotEndMin);
+  }
+
+  function conditionsOk(driverName, slot, isRain) {
+    const avail = getLatestAvailability(driverName, availability);
+    if (!avail) return false;
+    if (isRain && !toBool(avail.ok_rain)) return false;
+    if (toBool(slot.is_night_sim)  && !toBool(avail.ok_night_sim))  return false;
+    if (toBool(slot.is_night_real) && !toBool(avail.ok_night_real)) return false;
+    return true;
+  }
+
+  // Descanso só é obrigatório se o stint anterior atingiu o max_stint do piloto
+  function restedEnough(driverName, slotStartMin) {
+    const avail = getLatestAvailability(driverName, availability);
+    if (!avail) return true;
+    const state = getState(driverName);
+    const maxStint = Number(avail.max_stint_minutes) || 120;
+    if (state.prevStintMinutes < maxStint) return true; // stint curto, sem necessidade de descanso
+    if (state.lastSlotEndMin === null) return true;
+    const minRest = Number(avail.min_rest_minutes) || 30;
+    let gap = slotStartMin - state.lastSlotEndMin;
+    if (gap < 0) gap += 24 * 60;
+    return gap >= minRest;
+  }
+
   for (const slot of sortedSlots) {
-    const slotStartMin = timeToMinutes(slot.local_start);
-    const slotEndMin = timeToMinutes(slot.local_end);
+    const slotStartMin  = timeToMinutes(slot.local_start);
+    const slotEndMin    = timeToMinutes(slot.local_end);
     const slotDurationMin = slotEndMin >= slotStartMin
       ? slotEndMin - slotStartMin
-      : (24 * 60 - slotStartMin) + slotEndMin; // cruza meia-noite
+      : (24 * 60 - slotStartMin) + slotEndMin;
     const isRain = Number(slot.rain_pct) >= rainThreshold;
+    const slotNum = Number(slot.slot_number);
 
     for (const team of teams) {
-      // Tempo de cobertura efetiva: slot menos o tempo de pit stop
       const pitStopMin = (Number(team.pit_stop_seconds) || 90) / 60;
       const effectiveCoverageMin = slotDurationMin - pitStopMin;
 
@@ -557,89 +613,84 @@ function autoSchedule(body) {
         .filter(a => a.team_id === team.team_id)
         .map(a => a.driver_name);
 
-      // Filtra pilotos disponíveis e sem violações de descanso/condições
-      const eligible = teamDriverNames.filter(driverName => {
-        const avail = getLatestAvailability(driverName, availability);
-        if (!avail) return false;
+      const current = teamCurrentDriver[team.team_id] || null;
+      let primary = null;
 
-        let available;
-        const slotsCsv = String(avail.slots_csv || '').trim();
-        if (slotsCsv) {
-          const selectedSlots = slotsCsv.split(',').map(s => Number(s.trim())).filter(Boolean);
-          available = selectedSlots.includes(Number(slot.slot_number));
+      // ── Tentar manter o piloto atual no carro ──────────────────
+      if (current) {
+        const avail  = getLatestAvailability(current, availability);
+        const state  = getState(current);
+        const maxStint  = Number(avail?.max_stint_minutes) || 120;
+        const stintDur  = calcStintDuration(avail, team);
+        const isConsecutive = state.lastSlotNumber === slotNum - 1;
+        const fitsTime = state.continuousMinutes + slotDurationMin <= maxStint;
+        const coversSlot = stintDur >= effectiveCoverageMin;
+
+        if (isConsecutive &&
+            isAvailableInSlot(current, slot, slotStartMin, slotEndMin) &&
+            conditionsOk(current, slot, isRain) &&
+            fitsTime && coversSlot) {
+          primary = current; // piloto continua — mesmo stint, sem troca
         } else {
-          const fromSlot = Number(avail.slot_from) || 0;
-          const toSlot = Number(avail.slot_to) || 0;
-          if (fromSlot > 0 && toSlot > 0) {
-            available = Number(slot.slot_number) >= fromSlot && Number(slot.slot_number) <= toSlot;
-          } else {
-            const fromMin = timeToMinutes(avail.available_from);
-            const toMin = timeToMinutes(avail.available_to);
-            available = timeRangeContains(fromMin, toMin, slotStartMin, slotEndMin);
-          }
+          // Piloto sai: registra fim de stint
+          state.prevStintMinutes = state.continuousMinutes;
+          state.continuousMinutes = 0;
+          state.stintCount += 1;
+          teamCurrentDriver[team.team_id] = null;
         }
-        if (!available) return false;
-        if (isRain && !toBool(avail.ok_rain)) return false;
-        if (toBool(slot.is_night_sim) && !toBool(avail.ok_night_sim)) return false;
-        if (toBool(slot.is_night_real) && !toBool(avail.ok_night_real)) return false;
+      }
 
-        const state = driverState[driverName] || { lastStintEnd: null, totalMinutes: 0, stintCount: 0 };
-        const minRest = Number(avail.min_rest_minutes) || 30;
-        if (state.lastStintEnd !== null) {
-          let gap = slotStartMin - state.lastStintEnd;
-          if (gap < 0) gap += 24 * 60;
-          if (gap < minRest) return false;
-        }
+      // ── Selecionar novo piloto se necessário ──────────────────
+      if (!primary) {
+        const candidates = teamDriverNames.filter(name => {
+          if (name === current) return false; // já verificado acima, não pode continuar
+          if (!isAvailableInSlot(name, slot, slotStartMin, slotEndMin)) return false;
+          if (!conditionsOk(name, slot, isRain)) return false;
+          if (!restedEnough(name, slotStartMin)) return false;
+          const avail = getLatestAvailability(name, availability);
+          return calcStintDuration(avail, team) >= effectiveCoverageMin;
+        });
 
-        return true;
-      });
-
-      // Separar quem consegue cobrir o slot inteiro (stint >= cobertura efetiva)
-      // e quem tem stint mais curto (pode ser backup, mas não primary ideal)
-      function sortByFairnessAndRating(list) {
-        list.sort((a, b) => {
-          const stA = (driverState[a] || { stintCount: 0 }).stintCount;
-          const stB = (driverState[b] || { stintCount: 0 }).stintCount;
+        // Ordenar: menos stints completos primeiro (equilíbrio), iRating maior em empate
+        candidates.sort((a, b) => {
+          const stA = getState(a).stintCount;
+          const stB = getState(b).stintCount;
           if (stA !== stB) return stA - stB;
           return getDriverIRating(b, assignments) - getDriverIRating(a, assignments);
         });
+
+        primary = candidates[0] || null;
+        teamCurrentDriver[team.team_id] = primary;
       }
 
-      const canCover = eligible.filter(d => {
-        const avail = getLatestAvailability(d, availability);
-        return calcStintDuration(avail, team) >= effectiveCoverageMin;
-      });
-      const shortStint = eligible.filter(d => !canCover.includes(d));
-
-      sortByFairnessAndRating(canCover);
-      sortByFairnessAndRating(shortStint);
-
-      // Primary: preferência para quem cobre o slot; fallback para stint curto se não houver opção
-      const primary = canCover[0] || shortStint[0] || null;
-      // Backup: próximo elegível diferente do primary
-      const backup = eligible.filter(d => d !== primary)[0] || null;
-
+      // ── Atualizar estado do primary ────────────────────────────
       if (primary) {
-        const avail = getLatestAvailability(primary, availability);
-        const stintDur = calcStintDuration(avail, team);
-        const minutesInCar = Math.min(stintDur, slotDurationMin); // piloto dirige até o fim do stint ou do slot
-        if (!driverState[primary]) driverState[primary] = { lastStintEnd: null, totalMinutes: 0, stintCount: 0 };
-        driverState[primary].lastStintEnd = slotEndMin;
-        driverState[primary].totalMinutes += minutesInCar;
-        driverState[primary].stintCount += 1;
+        const state = getState(primary);
+        state.continuousMinutes += slotDurationMin;
+        state.lastSlotNumber    = slotNum;
+        state.lastSlotEndMin    = slotEndMin;
+        state.totalMinutes      += slotDurationMin;
       }
+
+      // ── Backup: qualquer elegível diferente do primary ─────────
+      const backup = teamDriverNames.find(name => {
+        if (name === primary) return false;
+        if (!isAvailableInSlot(name, slot, slotStartMin, slotEndMin)) return false;
+        if (!conditionsOk(name, slot, isRain)) return false;
+        return true;
+      }) || null;
 
       schedule.push({
-        schedule_id: generateUUID(),
-        race_id: raceId,
-        slot_id: slot.slot_id,
-        team_id: team.team_id,
-        team_name: team.team_name,
-        slot_number: slot.slot_number,
-        local_start: slot.local_start,
-        local_end: slot.local_end,
+        schedule_id:   generateUUID(),
+        race_id:       raceId,
+        slot_id:       slot.slot_id,
+        team_id:       team.team_id,
+        team_name:     team.team_name,
+        slot_number:   slot.slot_number,
+        local_start:   slot.local_start,
+        local_end:     slot.local_end,
         driver_primary: primary || '',
-        driver_backup: backup || '',
+        driver_backup:  backup  || '',
         status: 'planned',
       });
     }
