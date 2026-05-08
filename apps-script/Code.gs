@@ -624,22 +624,33 @@ function autoSchedule(body) {
       return;
     }
 
-    // Per-driver state (absolute time, not slot-indexed)
+    // Per-driver state: continuousMin tracks cumulative driving time in the current
+    // continuous block. It resets to 0 only after minRest minutes of actual rest.
     const driverState = {};
     function ds(name) {
-      if (!driverState[name]) driverState[name] = { totalMin: 0, lastEndAbs: null, prevStintMin: 0 };
+      if (!driverState[name]) driverState[name] = { totalMin: 0, continuousMin: 0, lastEndAbs: null };
       return driverState[name];
     }
 
-    function restedAtAbs(name, absMin) {
-      const av = getLatestAvailability(name, availability);
-      if (!av) return true;
+    // Compute effective continuous minutes at a given absolute time.
+    // Returns 0 (fresh start) if the driver has rested long enough since their last stint.
+    function effectiveCont(name, absMin) {
       const s = ds(name);
-      if (s.lastEndAbs === null) return true;
+      if (s.lastEndAbs === null) return 0;
+      const av = getLatestAvailability(name, availability);
+      const minRest = Number(av?.min_rest_minutes) || 30;
+      return (absMin - s.lastEndAbs) >= minRest ? 0 : s.continuousMin;
+    }
+
+    // A driver can start another stint only if their accumulated continuous time
+    // plus the next fuel-based stint won't exceed their max_stint_minutes.
+    // If it would, they need minRest minutes of rest first (which resets the counter).
+    function canDriveAtAbs(name, absMin) {
+      const av = getLatestAvailability(name, availability);
+      if (!av) return false;
       const maxStint = Number(av.max_stint_minutes) || 120;
-      if (s.prevStintMin < maxStint) return true; // didn't hit max stint → no forced rest
-      const minRest = Number(av.min_rest_minutes) || 30;
-      return (absMin - s.lastEndAbs) >= minRest;
+      const stintDur = calcStintDuration(av, team);
+      return effectiveCont(name, absMin) + stintDur <= maxStint;
     }
 
     const target = raceDurationMin / teamDrivers.length;
@@ -648,7 +659,7 @@ function autoSchedule(body) {
 
     while (curAbs < raceDurationMin) {
       const eligible = teamDrivers.filter(name =>
-        availAtAbs(name, curAbs) && conditionsAtAbs(name, curAbs) && restedAtAbs(name, curAbs)
+        availAtAbs(name, curAbs) && conditionsAtAbs(name, curAbs) && canDriveAtAbs(name, curAbs)
       );
 
       if (!eligible.length) {
@@ -666,11 +677,12 @@ function autoSchedule(body) {
         return getDriverIRating(b, assignments) - getDriverIRating(a, assignments);
       });
 
-      const driver  = eligible[0];
-      const av      = getLatestAvailability(driver, availability);
+      const driver   = eligible[0];
+      const av       = getLatestAvailability(driver, availability);
       const maxStint = Number(av?.max_stint_minutes) || 120;
-      // Stint duration = driver's fuel-based effective stint, capped by their max preference
-      const stintDur = Math.min(calcStintDuration(av, team), maxStint);
+      const eCont    = effectiveCont(driver, curAbs);
+      // Cap stint to what's left before hitting the driver's max continuous time
+      const stintDur = Math.min(calcStintDuration(av, team), maxStint - eCont);
       const endAbs   = Math.min(curAbs + stintDur, availEndAbs(driver), raceDurationMin);
 
       const backup = teamDrivers.find(n =>
@@ -680,9 +692,9 @@ function autoSchedule(body) {
       stintTimeline.push({ driver, backup, startAbs: curAbs, endAbs });
 
       const s = ds(driver);
-      s.totalMin    += endAbs - curAbs;
-      s.lastEndAbs  = endAbs;
-      s.prevStintMin = endAbs - curAbs;
+      s.continuousMin = eCont + (endAbs - curAbs); // accumulate (or fresh start if rested)
+      s.totalMin     += endAbs - curAbs;
+      s.lastEndAbs    = endAbs;
 
       curAbs = endAbs + pitStopMin; // advance past pit stop
     }
