@@ -210,9 +210,11 @@ const Schedule = (() => {
     // caused by writing-mode on the rotated header cells).
     function applyFitWidth() {
       if (window.innerWidth < 900) return;
+      const cw = wrapper.clientWidth || container.clientWidth || 0;
+      if (cw < 300) return;
       const labelW   = 130;
       const iratingW = 46;
-      const available = wrapper.clientWidth - labelW - iratingW;
+      const available = cw - labelW - iratingW;
       const sw = Math.max(28, Math.floor(available / sorted.length));
       wrapper.querySelectorAll('.grid-cell.slot').forEach(c => {
         c.style.width    = sw + 'px';
@@ -220,19 +222,30 @@ const Schedule = (() => {
       });
     }
 
-    requestAnimationFrame(applyFitWidth);
+    // Use ResizeObserver so we measure after the wrapper has its real size.
+    // Fall back to double-rAF on browsers that don't support it.
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(() => { applyFitWidth(); });
+      ro.observe(wrapper);
+      // Clean up when grid is replaced
+      const domObserver = new MutationObserver(() => {
+        if (!wrapper.isConnected) { ro.disconnect(); domObserver.disconnect(); }
+      });
+      domObserver.observe(wrapper.parentElement || document.body, { childList: true });
+    } else {
+      requestAnimationFrame(() => requestAnimationFrame(applyFitWidth));
+    }
 
     // Keep aligned on window resize
-    const _onResize = () => applyFitWidth();
-    window.addEventListener('resize', _onResize);
-    // Clean up when grid is replaced
-    const observer = new MutationObserver(() => {
+    window.addEventListener('resize', applyFitWidth);
+    // Clean up resize listener when grid is replaced
+    const _domCleanup = new MutationObserver(() => {
       if (!wrapper.isConnected) {
-        window.removeEventListener('resize', _onResize);
-        observer.disconnect();
+        window.removeEventListener('resize', applyFitWidth);
+        _domCleanup.disconnect();
       }
     });
-    observer.observe(wrapper.parentElement || document.body, { childList: true });
+    _domCleanup.observe(wrapper.parentElement || document.body, { childList: true });
   }
 
   function buildHeaderRow(labelText, slots, cellBuilderFn, showIrating = true) {
