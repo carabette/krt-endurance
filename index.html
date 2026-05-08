@@ -51,13 +51,41 @@
   <!-- Feedback -->
   <div id="page-feedback"></div>
 
-  <!-- Schedule Grid -->
-  <div id="schedule-container">
-    <div class="loading">
-      <div class="spinner"></div>
-      <span>Selecione uma corrida para visualizar o cronograma.</span>
+  <!-- Intro (shown before race selection) -->
+  <div id="intro-section" class="intro-section">
+    <h2 class="intro-title">Cronograma de Stints</h2>
+    <p class="intro-desc">
+      Sistema de gestão de stints para corridas de endurance no iRacing.
+      Pilotos registram disponibilidade, o sistema distribui equipes e gera o cronograma
+      automaticamente respeitando limites de stint, descanso e condições de pista.
+    </p>
+    <div class="intro-links">
+      <div class="intro-link-item">
+        <span class="intro-link-icon">📋</span>
+        <div>
+          <strong>Cronograma</strong>
+          <span>Grade visual de stints por equipe, chuva e período noturno</span>
+        </div>
+      </div>
+      <div class="intro-link-item">
+        <span class="intro-link-icon">✍️</span>
+        <div>
+          <strong><a href="disponibilidade.html">Disponibilidade</a></strong>
+          <span>Registre seus horários e preferências para a corrida</span>
+        </div>
+      </div>
+      <div class="intro-link-item">
+        <span class="intro-link-icon">⚙️</span>
+        <div>
+          <strong><a href="admin.html">Admin</a></strong>
+          <span>Crie corridas, aloque equipes e gere o cronograma</span>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- Schedule Grid (empty until race selected) -->
+  <div id="schedule-container"></div>
 
   <!-- Detail Table -->
   <div id="detail-container"></div>
@@ -144,11 +172,6 @@
           raceSelect.appendChild(opt);
         });
 
-      // Se só tiver uma, seleciona automaticamente
-      if (races.filter(r => r.status !== 'completed').length === 1) {
-        raceSelect.selectedIndex = 1;
-        raceSelect.dispatchEvent(new Event('change'));
-      }
     }
   } catch (err) {
     showPageFeedback('error', 'Erro ao carregar corridas: ' + err.message);
@@ -159,12 +182,15 @@
   // ============================================================
   raceSelect.addEventListener('change', () => {
     currentRaceId = raceSelect.value;
+    const intro = document.getElementById('intro-section');
     if (!currentRaceId) {
-      scheduleContainer.innerHTML = '<div class="loading"><span>Selecione uma corrida.</span></div>';
+      scheduleContainer.innerHTML = '';
       detailContainer.innerHTML = '';
       raceMeta.innerHTML = '';
+      if (intro) intro.style.display = '';
       return;
     }
+    if (intro) intro.style.display = 'none';
     loadSchedule();
   });
 

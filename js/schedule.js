@@ -64,11 +64,11 @@ const Schedule = (() => {
     const headerGroup = document.createElement('div');
     headerGroup.className = 'grid-header-group';
 
-    // Row 1: Hora local
-    const row1 = buildHeaderRow('Hora local', sorted, s => {
+    // Row 1: Hora local (rotacionada 90° para caber na largura)
+    const row1 = buildHeaderRow('', sorted, s => {
       const cell = document.createElement('div');
-      cell.className = `time-cell${toBool(s.is_night_real) ? ' slot-night' : ''}`;
-      cell.innerHTML = `<span class="local">${s.local_start}</span><span class="sim">${s.sim_start}</span>`;
+      cell.className = `time-cell-rotated${toBool(s.is_night_real) ? ' night' : ''}`;
+      cell.innerHTML = `<span>${s.local_start}</span>`;
       return cell;
     }, false);
     headerGroup.appendChild(row1);
@@ -148,10 +148,6 @@ const Schedule = (() => {
 
           if (isPrimary) {
             stint.className = `stint-cell stint-active ${color.cls}`;
-            const stintNum = (schedule || [])
-              .filter(s => s.team_id === team.team_id && s.driver_primary === driverAssign.driver_name)
-              .findIndex(s => s.slot_id === slot.slot_id);
-            stint.textContent = `Stint ${stintNum + 1}`;
             stint.style.cssText = `background:${color.bg};color:${color.text};border-left-color:${color.dark}`;
 
             if (Number(slot.rain_pct) >= (race.rain_threshold_pct || 10)) {
@@ -180,7 +176,6 @@ const Schedule = (() => {
 
           } else if (isBackup) {
             stint.className = 'stint-cell stint-backup';
-            stint.textContent = 'Backup';
           } else {
             stint.className = 'stint-cell stint-unavailable';
           }
