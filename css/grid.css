@@ -418,6 +418,7 @@
 
   .schedule-grid {
     width: 100%;
+    table-layout: fixed;
   }
 }
 

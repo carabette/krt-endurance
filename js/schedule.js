@@ -203,49 +203,33 @@ const Schedule = (() => {
       <div class="legend-item"><span style="color:#2196f3">—</span><span>Chuva</span></div>
     `;
     wrapper.appendChild(legend);
-    container.appendChild(wrapper);
 
-    // On desktop, compute slot widths from actual container size so header
-    // and body columns are guaranteed to align (avoids table-layout issues
-    // caused by writing-mode on the rotated header cells).
     function applyFitWidth() {
       if (window.innerWidth < 900) return;
-      const cw = wrapper.clientWidth || container.clientWidth || 0;
-      if (cw < 300) return;
-      const labelW   = 130;
-      const iratingW = 46;
-      const available = cw - labelW - iratingW;
-      const sw = Math.max(28, Math.floor(available / sorted.length));
+      // getBoundingClientRect forces synchronous layout → real width, no async guessing
+      const rect = wrapper.getBoundingClientRect();
+      if (rect.width < 300) return;
+      const labelW   = 120;
+      const iratingW = 52;
+      const available = rect.width - labelW - iratingW;
+      const sw = Math.max(20, Math.floor(available / sorted.length));
       wrapper.querySelectorAll('.grid-cell.slot').forEach(c => {
         c.style.width    = sw + 'px';
         c.style.minWidth = sw + 'px';
       });
     }
 
-    // Use ResizeObserver so we measure after the wrapper has its real size.
-    // Fall back to double-rAF on browsers that don't support it.
-    if (typeof ResizeObserver !== 'undefined') {
-      const ro = new ResizeObserver(() => { applyFitWidth(); });
-      ro.observe(wrapper);
-      // Clean up when grid is replaced
-      const domObserver = new MutationObserver(() => {
-        if (!wrapper.isConnected) { ro.disconnect(); domObserver.disconnect(); }
-      });
-      domObserver.observe(wrapper.parentElement || document.body, { childList: true });
-    } else {
-      requestAnimationFrame(() => requestAnimationFrame(applyFitWidth));
-    }
+    container.appendChild(wrapper);
+    applyFitWidth();
 
-    // Keep aligned on window resize
     window.addEventListener('resize', applyFitWidth);
-    // Clean up resize listener when grid is replaced
     const _domCleanup = new MutationObserver(() => {
       if (!wrapper.isConnected) {
         window.removeEventListener('resize', applyFitWidth);
         _domCleanup.disconnect();
       }
     });
-    _domCleanup.observe(wrapper.parentElement || document.body, { childList: true });
+    _domCleanup.observe(container, { childList: true });
   }
 
   function buildHeaderRow(labelText, slots, cellBuilderFn, showIrating = true) {
