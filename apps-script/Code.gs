@@ -628,7 +628,7 @@ function autoSchedule(body) {
     // continuous block. It resets to 0 only after minRest minutes of actual rest.
     const driverState = {};
     function ds(name) {
-      if (!driverState[name]) driverState[name] = { totalMin: 0, continuousMin: 0, lastEndAbs: null };
+      if (!driverState[name]) driverState[name] = { totalMin: 0, continuousMin: 0, lastEndAbs: null, stintCount: 0 };
       return driverState[name];
     }
 
@@ -669,17 +669,16 @@ function autoSchedule(body) {
       }
 
       // Continuity preference: keep the previous driver in the car if they're still
-      // eligible AND their accumulated time is not more than one fuel stint ahead of
-      // the least-driven eligible driver (fairness guard).
+      // eligible AND they haven't done more than 1 stint ahead of the least-driven
+      // eligible driver (stint-count fairness guard). Using stint count (not minutes)
+      // works correctly from the start of the race when other drivers are at 0.
       const otherEligible = eligible.filter(n => n !== lastDriver);
-      const minOtherTotal = otherEligible.length > 0
-        ? Math.min(...otherEligible.map(n => ds(n).totalMin))
+      const minOtherStints = otherEligible.length > 0
+        ? Math.min(...otherEligible.map(n => ds(n).stintCount))
         : Infinity;
-      const lastAv = lastDriver ? getLatestAvailability(lastDriver, availability) : null;
-      const lastStintDur = lastAv ? calcStintDuration(lastAv, team) : 0;
       const canContinue = lastDriver !== null &&
         eligible.includes(lastDriver) &&
-        ds(lastDriver).totalMin < minOtherTotal + lastStintDur;
+        ds(lastDriver).stintCount <= minOtherStints + 1;
 
       // Sort: continuity first (when fair), then urgency → equity → iRating.
       eligible.sort((a, b) => {
@@ -713,6 +712,7 @@ function autoSchedule(body) {
       s.continuousMin = eCont + (endAbs - curAbs); // accumulate (or fresh start if rested)
       s.totalMin     += endAbs - curAbs;
       s.lastEndAbs    = endAbs;
+      s.stintCount   += 1;
 
       curAbs = endAbs + pitStopMin; // advance past pit stop
     }
