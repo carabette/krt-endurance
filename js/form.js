@@ -77,6 +77,11 @@
 
     if (!raceId) { updatePreview(); return; }
 
+    const slotSection = document.getElementById('slot-section');
+    const slotGrid = document.getElementById('slot-grid');
+    slotSection.style.display = 'block';
+    slotGrid.innerHTML = '<div class="loading"><div class="spinner"></div><span>Carregando slots…</span></div>';
+
     try {
       const detail = await API.getRaceDetail(raceId);
       currentRace = detail.race;
@@ -86,6 +91,7 @@
       renderSlotGrid(currentRace, currentTimeslots);
       updatePreview();
     } catch (err) {
+      slotSection.style.display = 'none';
       currentTeams = [];
       showFeedback('error', 'Erro ao carregar corrida: ' + err.message);
     }
