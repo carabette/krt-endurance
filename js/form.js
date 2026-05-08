@@ -170,12 +170,10 @@
     if (!name) { showFeedback('error', 'Informe seu nome.'); return; }
 
     const btn = document.getElementById('register-btn');
-    btn.disabled = true;
-    btn.textContent = 'Cadastrando…';
+    btnLoading(btn, true, 'Cadastrando…');
     try {
       const cars = window.getSelectedCars ? window.getSelectedCars('reg-cars-container') : '';
       await API.selfRegisterDriver({ name, irating: irating || 1500, race_id: raceId, password, cars_available: cars });
-      // Reload drivers and select the new one
       drivers = await API.getDrivers();
       populateDriverSelect(drivers);
       driverSelect.value = name;
@@ -184,8 +182,7 @@
     } catch (err) {
       showFeedback('error', 'Erro ao cadastrar: ' + err.message);
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Cadastrar';
+      btnLoading(btn, false, 'Cadastrar');
     }
   });
 
@@ -293,8 +290,7 @@
     };
 
     const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Enviando…';
+    btnLoading(submitBtn, true, 'Enviando…');
 
     try {
       await API.submitAvailability(payload);
@@ -310,14 +306,24 @@
     } catch (err) {
       showFeedback('error', 'Erro ao enviar: ' + err.message);
     } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Enviar Disponibilidade';
+      btnLoading(submitBtn, false, 'Enviar Disponibilidade');
     }
   });
 
   // ============================================================
   // Helpers
   // ============================================================
+
+  function btnLoading(btn, loading, label) {
+    if (loading) {
+      btn.disabled = true;
+      btn.dataset.origText = btn.textContent;
+      btn.innerHTML = label + ' <span class="spinner" style="width:14px;height:14px;border-width:2px;vertical-align:middle;display:inline-block;flex-shrink:0"></span>';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.origText || label;
+    }
+  }
 
   function showFeedback(type, html) {
     feedback.innerHTML = `<div class="alert alert-${type}">${html}</div>`;

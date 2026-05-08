@@ -302,6 +302,8 @@
     const cid = document.getElementById('d-cid').value.trim();
     const cars = window.getSelectedCars ? window.getSelectedCars('d-cars-container') : '';
     if (!name) { alert('Informe o nome do piloto.'); return; }
+    const btn = document.getElementById('add-driver-btn');
+    btnLoading(btn, true, 'Adicionando…');
     try {
       await API.createDriver({ name, irating, iracing_cid: cid, cars_available: cars, password: adminPassword });
       document.getElementById('driver-feedback').innerHTML = '<div class="alert alert-success">Piloto adicionado!</div>';
@@ -310,6 +312,8 @@
       await loadDrivers();
     } catch (err) {
       document.getElementById('driver-feedback').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    } finally {
+      btnLoading(btn, false, 'Adicionar Piloto');
     }
   });
 
@@ -344,6 +348,8 @@
     const fb = document.getElementById('manage-feedback');
     const res = document.getElementById('manage-result');
     fb.innerHTML = ''; res.innerHTML = '';
+    const btn = document.getElementById('btn-assign-teams');
+    btnLoading(btn, true, 'Alocando…');
     try {
       const result = await API.assignTeams({ race_id: raceId, password: adminPassword });
       const lines = (result.assignments || []).map(a =>
@@ -353,6 +359,8 @@
       res.innerHTML = `<div style="font-size:12px;line-height:1.8">${lines || 'Nenhum piloto alocado (sem disponibilidade cadastrada).'}</div>`;
     } catch (err) {
       fb.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    } finally {
+      btnLoading(btn, false, 'Alocar Equipes');
     }
   });
 
@@ -362,11 +370,15 @@
     const fb = document.getElementById('manage-feedback');
     const res = document.getElementById('manage-result');
     fb.innerHTML = ''; res.innerHTML = '';
+    const btn = document.getElementById('btn-auto-schedule');
+    btnLoading(btn, true, 'Gerando…');
     try {
       const result = await API.autoSchedule({ race_id: raceId, password: adminPassword });
       fb.innerHTML = `<div class="alert alert-success">Cronograma gerado! ${result.slots_scheduled} slots agendados.</div>`;
     } catch (err) {
       fb.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    } finally {
+      btnLoading(btn, false, 'Gerar Cronograma');
     }
   });
 
@@ -502,8 +514,7 @@
     };
 
     const btn = e.target.querySelector('button[type=submit]');
-    btn.disabled = true;
-    btn.textContent = 'Criando…';
+    btnLoading(btn, true, 'Criando…');
     try {
       const result = await API.createRace(payload);
       feedback.innerHTML = `<div class="alert alert-success">Corrida criada! ID: <code>${result.race_id}</code>. Os timeslots foram gerados automaticamente.</div>`;
@@ -513,14 +524,24 @@
     } catch (err) {
       feedback.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
     } finally {
-      btn.disabled = false;
-      btn.textContent = 'Criar Corrida';
+      btnLoading(btn, false, 'Criar Corrida');
     }
   });
 
   // ============================================================
   // Helpers
   // ============================================================
+  function btnLoading(btn, loading, label) {
+    if (loading) {
+      btn.disabled = true;
+      btn.dataset.origText = btn.textContent;
+      btn.innerHTML = label + ' <span class="spinner" style="width:14px;height:14px;border-width:2px;vertical-align:middle;display:inline-block;flex-shrink:0"></span>';
+    } else {
+      btn.disabled = false;
+      btn.textContent = btn.dataset.origText || label;
+    }
+  }
+
   function formatDate(val) {
     if (!val) return '—';
     try { return new Date(val).toLocaleDateString('pt-BR'); } catch (_) { return String(val); }
