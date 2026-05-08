@@ -4,5 +4,5 @@
 // ============================================================
 
 window.KRT_CONFIG = {
-  scriptUrl: 'https://script.google.com/macros/s/AKfycbxzVZG7Y1w67LW4pfSOaIjc2A_YuUKN6_W8fBkEx2ANBHJYxKjIZlvuWPcqZdpGsES_/exec',
+  scriptUrl: 'https://script.google.com/macros/s/AKfycbyQ13CuyJpgwenrWGh3thIo6PIy8t57EMNqH6Irccfdox0P-Owxd4VZzHsXU9I0LqJ5/exec',
 };
