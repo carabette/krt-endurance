@@ -656,6 +656,7 @@ function autoSchedule(body) {
     const target = raceDurationMin / teamDrivers.length;
     const stintTimeline = []; // { driver, backup, startAbs, endAbs }
     let curAbs = 0;
+    let lastDriver = null; // track previous stint driver for continuity preference
 
     while (curAbs < raceDurationMin) {
       const eligible = teamDrivers.filter(name =>
@@ -667,9 +668,25 @@ function autoSchedule(body) {
         continue;
       }
 
-      // Sort by urgency (who needs the most time relative to remaining availability),
-      // then by total accumulated time (equity), then by iRating as tiebreaker.
+      // Continuity preference: keep the previous driver in the car if they're still
+      // eligible AND their accumulated time is not more than one fuel stint ahead of
+      // the least-driven eligible driver (fairness guard).
+      const otherEligible = eligible.filter(n => n !== lastDriver);
+      const minOtherTotal = otherEligible.length > 0
+        ? Math.min(...otherEligible.map(n => ds(n).totalMin))
+        : Infinity;
+      const lastAv = lastDriver ? getLatestAvailability(lastDriver, availability) : null;
+      const lastStintDur = lastAv ? calcStintDuration(lastAv, team) : 0;
+      const canContinue = lastDriver !== null &&
+        eligible.includes(lastDriver) &&
+        ds(lastDriver).totalMin < minOtherTotal + lastStintDur;
+
+      // Sort: continuity first (when fair), then urgency → equity → iRating.
       eligible.sort((a, b) => {
+        if (canContinue) {
+          if (a === lastDriver) return -1;
+          if (b === lastDriver) return 1;
+        }
         const aNeed = Math.max(0, target - ds(a).totalMin);
         const bNeed = Math.max(0, target - ds(b).totalMin);
         if (Math.abs(aNeed - bNeed) > 1) return bNeed - aNeed;
@@ -678,6 +695,7 @@ function autoSchedule(body) {
       });
 
       const driver   = eligible[0];
+      lastDriver = driver;
       const av       = getLatestAvailability(driver, availability);
       const maxStint = Number(av?.max_stint_minutes) || 120;
       const eCont    = effectiveCont(driver, curAbs);
