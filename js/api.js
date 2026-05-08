@@ -18,11 +18,14 @@ const API = (() => {
   }
 
   async function post(body) {
+    // Apps Script POST + redirect causa bloqueio de CORS no browser.
+    // Solução: enviar o payload codificado como parâmetro GET, que retorna
+    // com Access-Control-Allow-Origin: * sem redirect intermediário.
     if (!SCRIPT_URL) throw new Error('URL do script não configurado. Edite js/config.js');
-    const res = await fetch(SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
+    const url = new URL(SCRIPT_URL);
+    url.searchParams.set('payload', JSON.stringify(body));
+    const res = await fetch(url.toString());
+    if (!res.ok) throw new Error('Erro de rede: ' + res.status);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
     return data;

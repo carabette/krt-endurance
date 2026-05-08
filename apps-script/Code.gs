@@ -101,6 +101,17 @@ function minutesToTime(minutes) {
 // ============================================================
 
 function doGet(e) {
+  // Operações de escrita chegam via GET com payload JSON codificado
+  // (contorna bloqueio de CORS em POST cross-origin com redirect)
+  if (e.parameter.payload) {
+    try {
+      const body = JSON.parse(e.parameter.payload);
+      return dispatchWrite(body);
+    } catch (err) {
+      return cors({ error: err.message });
+    }
+  }
+
   const action = e.parameter.action;
   const params = e.parameter;
   try {
@@ -112,6 +123,24 @@ function doGet(e) {
       case 'getSchedule':    return cors(getSchedule(params.race_id));
       case 'getAvailability':return cors(getAvailability(params.race_id));
       default:               return cors({ error: 'Ação não encontrada: ' + action });
+    }
+  } catch (err) {
+    return cors({ error: err.message });
+  }
+}
+
+function dispatchWrite(body) {
+  const action = body.action;
+  try {
+    switch (action) {
+      case 'submitAvailability': return cors(submitAvailability(body));
+      case 'assignTeams':        return cors(assignTeams(body));
+      case 'autoSchedule':       return cors(autoSchedule(body));
+      case 'updateSlot':         return cors(updateSlot(body));
+      case 'createRace':         return cors(createRace(body));
+      case 'createDriver':       return cors(createDriver(body));
+      case 'updateDriver':       return cors(updateDriver(body));
+      default:                   return cors({ error: 'Ação não encontrada: ' + action });
     }
   } catch (err) {
     return cors({ error: err.message });
