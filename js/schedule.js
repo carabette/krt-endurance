@@ -147,8 +147,7 @@ const Schedule = (() => {
           const isBackup  = entry && entry.driver_backup  === driverAssign.driver_name;
 
           if (isPrimary) {
-            stint.className = `stint-cell stint-active ${color.cls}`;
-            stint.style.cssText = `background:${color.bg};color:${color.text};border-left-color:${color.dark}`;
+            stint.className = 'stint-cell stint-active';
 
             if (Number(slot.rain_pct) >= (race.rain_threshold_pct || 10)) {
               const overlay = document.createElement('div');
@@ -195,9 +194,8 @@ const Schedule = (() => {
     const legend = document.createElement('div');
     legend.className = 'schedule-legend';
     legend.innerHTML = `
-      <div class="legend-item"><div class="legend-box stint-active-t1"></div><span>Stint ativo (Eq. 1)</span></div>
-      <div class="legend-item"><div class="legend-box stint-active-t2"></div><span>Stint ativo (Eq. 2)</span></div>
-      <div class="legend-item"><div class="legend-box stint-backup-l"></div><span>Backup</span></div>
+      <div class="legend-item"><div class="legend-box" style="background:#4caf50;border-radius:2px"></div><span>Stint ativo</span></div>
+      <div class="legend-item"><div class="legend-box" style="background:#ffd54f;border-radius:2px"></div><span>Backup</span></div>
       <div class="legend-item"><div class="legend-box stint-unavail-l"></div><span>Indisponível</span></div>
       <div class="legend-item"><span style="color:#3a3a6e">■</span><span>Noite (sim)</span></div>
       <div class="legend-item"><span style="color:#2196f3">—</span><span>Chuva</span></div>
