@@ -16,6 +16,7 @@
   let currentTeams = [];
   let currentTimeslots = [];
   let currentRace = null;
+  let currentAvailabilities = [];
 
   // ============================================================
   // Inicialização
@@ -71,9 +72,12 @@
     const raceId = raceSelect.value;
     document.getElementById('slot-section').style.display = 'none';
     document.getElementById('slot-grid').innerHTML = '';
+    document.getElementById('edit-notice').style.display = 'none';
+    renderSubmittedList([]);
     currentTimeslots = [];
     currentTeams = [];
     currentRace = null;
+    currentAvailabilities = [];
 
     if (!raceId) { updatePreview(); return; }
 
@@ -83,12 +87,18 @@
     slotGrid.innerHTML = '<div class="loading"><div class="spinner"></div><span>Carregando slots…</span></div>';
 
     try {
-      const detail = await API.getRaceDetail(raceId);
+      const [detail, avData] = await Promise.all([
+        API.getRaceDetail(raceId),
+        API.getAvailability(raceId).catch(() => ({ availability: [] })),
+      ]);
       currentRace = detail.race;
       currentTeams = detail.teams || [];
       currentTimeslots = (detail.timeslots || []).sort((a, b) => Number(a.slot_number) - Number(b.slot_number));
+      currentAvailabilities = avData.availability || [];
       updateRaceInfo(currentRace);
       renderSlotGrid(currentRace, currentTimeslots);
+      renderSubmittedList(currentAvailabilities);
+      prefillFromExisting(driverSelect.value);
       updatePreview();
     } catch (err) {
       slotSection.style.display = 'none';
@@ -153,9 +163,11 @@
     const reg = document.getElementById('self-register-section');
     if (driverSelect.value === '__new__') {
       reg.style.display = 'block';
+      document.getElementById('edit-notice').style.display = 'none';
       if (window.renderCarCheckboxes) window.renderCarCheckboxes('reg-cars-container', '');
     } else {
       reg.style.display = 'none';
+      prefillFromExisting(driverSelect.value);
     }
   });
 
@@ -300,10 +312,16 @@
       document.getElementById('slot-section').style.display = 'none';
       document.getElementById('slot-grid').innerHTML = '';
       document.getElementById('self-register-section').style.display = 'none';
+      document.getElementById('edit-notice').style.display = 'none';
       stintPreview?.classList.remove('visible');
       collBody?.classList.remove('open');
       collBtn?.classList.remove('open');
       currentTimeslots = [];
+      // Refresh submitted list
+      API.getAvailability(raceId).then(avData => {
+        currentAvailabilities = avData.availability || [];
+        renderSubmittedList(currentAvailabilities);
+      }).catch(() => {});
     } catch (err) {
       showFeedback('error', 'Erro ao enviar: ' + err.message);
     } finally {
@@ -329,6 +347,75 @@
   function showFeedback(type, html) {
     feedback.innerHTML = `<div class="alert alert-${type}">${html}</div>`;
     feedback.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function renderSubmittedList(avs) {
+    const container = document.getElementById('submitted-pilots');
+    if (!container) return;
+    if (!avs || avs.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    const names = [...new Set(avs.map(a => a.driver_name))];
+    container.innerHTML = `
+      <div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:6px;padding:12px 16px;">
+        <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px;">
+          Disponibilidade enviada — ${names.length} piloto${names.length !== 1 ? 's' : ''}
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          ${names.map(n => `
+            <span style="background:#e8f5e9;border:1px solid #a5d6a7;color:#2e7d32;border-radius:16px;padding:3px 10px;font-size:12px;font-weight:600;">✓ ${n}</span>
+          `).join('')}
+        </div>
+      </div>`;
+  }
+
+  function prefillFromExisting(driverName) {
+    const notice = document.getElementById('edit-notice');
+    if (!notice) return;
+    if (!driverName || driverName === '__new__' || !currentAvailabilities.length) {
+      notice.style.display = 'none';
+      return;
+    }
+    const existing = currentAvailabilities.find(a => a.driver_name === driverName);
+    if (!existing) {
+      notice.style.display = 'none';
+      return;
+    }
+
+    notice.style.display = 'block';
+
+    // Pre-fill selected slots
+    if (existing.slots_csv) {
+      const selected = new Set(String(existing.slots_csv).split(',').map(s => s.trim()));
+      document.querySelectorAll('#slot-grid input[name=slot]').forEach(cb => {
+        cb.checked = selected.has(String(cb.value));
+      });
+    }
+
+    // Pre-fill conditions
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.checked = toBool(val); };
+    set('ok-rain',      existing.ok_rain);
+    set('ok-night-sim', existing.ok_night_sim);
+    set('ok-night-real', existing.ok_night_real);
+
+    // Pre-fill max stint / min rest (stored in minutes, input expects hours)
+    const maxStintEl = document.getElementById('max-stint');
+    const minRestEl  = document.getElementById('min-rest');
+    if (maxStintEl && existing.max_stint_minutes) maxStintEl.value = (Number(existing.max_stint_minutes) / 60).toFixed(1).replace(/\.0$/, '');
+    if (minRestEl  && existing.min_rest_minutes)  minRestEl.value  = (Number(existing.min_rest_minutes)  / 60).toFixed(1).replace(/\.0$/, '');
+
+    // Pre-fill optional driving data
+    const lapEl  = document.getElementById('custom-laptime');
+    const fuelEl = document.getElementById('custom-fuel');
+    if (lapEl  && existing.custom_avg_laptime_sec)  lapEl.value  = existing.custom_avg_laptime_sec;
+    if (fuelEl && existing.custom_avg_fuel_per_lap) fuelEl.value = existing.custom_avg_fuel_per_lap;
+
+    updatePreview();
+  }
+
+  function toBool(val) {
+    return val === true || val === 'TRUE' || val === 'true' || val === '1';
   }
 
   function updateRaceInfo(race) {

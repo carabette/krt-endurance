@@ -50,7 +50,10 @@
         </div>
 
         <!-- Info da corrida -->
-        <div id="race-info" style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666;font-family:var(--font-mono);margin-bottom:16px;min-height:18px;"></div>
+        <div id="race-info" style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666;font-family:var(--font-mono);margin-bottom:12px;min-height:18px;"></div>
+
+        <!-- Pilotos que já enviaram -->
+        <div id="submitted-pilots" style="margin-bottom:16px;"></div>
 
         <!-- Piloto -->
         <div class="form-group">
@@ -58,6 +61,11 @@
           <select id="driver-select" required>
             <option value="">Carregando…</option>
           </select>
+        </div>
+
+        <!-- Aviso de edição -->
+        <div id="edit-notice" style="display:none;background:#e3f2fd;border:1px solid #90caf9;border-radius:6px;padding:10px 14px;font-size:12px;color:#1565c0;margin-bottom:12px;">
+          ✏️ Você já enviou disponibilidade para esta corrida. Os campos foram preenchidos com seus dados anteriores — edite e envie novamente para atualizar.
         </div>
 
         <!-- Auto-cadastro -->
