@@ -45,11 +45,14 @@
   left: 0;
   z-index: 10;
   background: var(--color-surface);
+  width: 120px;
   min-width: 120px;
-  max-width: 150px;
+  max-width: 120px;
   padding: 4px 10px;
   font-weight: 600;
   font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
   border-right: 2px solid var(--color-border);
 }
 
@@ -59,6 +62,7 @@
   left: 120px;
   z-index: 10;
   background: var(--color-surface);
+  width: 52px;
   min-width: 52px;
   padding: 4px 6px;
   text-align: center;
@@ -219,19 +223,11 @@
 /* Active stint — solid green */
 .stint-active {
   background: #4caf50;
-  border-radius: 2px;
-  margin: 2px;
-  width: calc(100% - 4px);
-  height: calc(100% - 4px);
 }
 
 /* Backup — solid yellow */
 .stint-backup {
   background: #ffd54f;
-  border-radius: 2px;
-  margin: 2px;
-  width: calc(100% - 4px);
-  height: calc(100% - 4px);
 }
 
 /* Unavailable */
