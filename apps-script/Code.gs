@@ -454,10 +454,13 @@ function assignTeams(body) {
   const availableDrivers = drivers.filter(d => availableDriverNames.includes(d.name));
 
   // Para cada equipe, pilotos elegíveis = têm o carro (comparação case-insensitive)
+  // Piloto sem carros cadastrados (cars_available vazio) é elegível para qualquer equipe
   const teamEligible = teams.map(team => {
     const carId = String(team.iracing_car_id || team.car_name || '').trim().toLowerCase();
     const eligible = availableDrivers.filter(d => {
-      const cars = String(d.cars_available).split(',').map(c => c.trim().toLowerCase());
+      const rawCars = String(d.cars_available || '').trim();
+      if (!rawCars) return true; // sem restrição de carro
+      const cars = rawCars.split(',').map(c => c.trim().toLowerCase()).filter(Boolean);
       return carId === '' || cars.includes(carId);
     }).sort((a, b) => Number(b.irating) - Number(a.irating));
     return { team, eligible, assigned: [], iRatingSum: 0 };
