@@ -415,6 +415,7 @@ function submitAvailability(body) {
   const availSheet = getSheet(SHEETS.AVAILABILITY);
   ensureColumn(availSheet, 'slot_from');
   ensureColumn(availSheet, 'slot_to');
+  ensureColumn(availSheet, 'slots_csv');
 
   appendObject(availSheet, {
     availability_id: generateUUID(),
@@ -433,6 +434,7 @@ function submitAvailability(body) {
     effective_stint_minutes: effectiveStint,
     slot_from: Number(body.slot_from) || '',
     slot_to: Number(body.slot_to) || '',
+    slots_csv: body.slots_csv || '',
   });
   return { success: true };
 }
@@ -552,14 +554,22 @@ function autoSchedule(body) {
         if (!avail) return false;
 
         let available;
-        const fromSlot = Number(avail.slot_from) || 0;
-        const toSlot = Number(avail.slot_to) || 0;
-        if (fromSlot > 0 && toSlot > 0) {
-          available = Number(slot.slot_number) >= fromSlot && Number(slot.slot_number) <= toSlot;
+        const slotsCsv = String(avail.slots_csv || '').trim();
+        if (slotsCsv) {
+          // Lista exata de slots selecionados pelo piloto
+          const selectedSlots = slotsCsv.split(',').map(s => Number(s.trim())).filter(Boolean);
+          available = selectedSlots.includes(Number(slot.slot_number));
         } else {
-          const fromMin = timeToMinutes(avail.available_from);
-          const toMin = timeToMinutes(avail.available_to);
-          available = timeRangeContains(fromMin, toMin, slotStartMin, slotEndMin);
+          // Fallback: intervalo (registros antigos sem slots_csv)
+          const fromSlot = Number(avail.slot_from) || 0;
+          const toSlot = Number(avail.slot_to) || 0;
+          if (fromSlot > 0 && toSlot > 0) {
+            available = Number(slot.slot_number) >= fromSlot && Number(slot.slot_number) <= toSlot;
+          } else {
+            const fromMin = timeToMinutes(avail.available_from);
+            const toMin = timeToMinutes(avail.available_to);
+            available = timeRangeContains(fromMin, toMin, slotStartMin, slotEndMin);
+          }
         }
         if (!available) return false;
         if (isRain && !toBool(avail.ok_rain)) return false;

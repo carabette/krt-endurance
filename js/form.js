@@ -279,6 +279,7 @@
       available_to: availTo,
       slot_from: slotFrom,
       slot_to: slotTo,
+      slots_csv: checkedSlots.join(','),
       ok_rain:      document.getElementById('ok-rain').checked,
       ok_night_sim: document.getElementById('ok-night-sim').checked,
       ok_night_real:document.getElementById('ok-night-real').checked,
