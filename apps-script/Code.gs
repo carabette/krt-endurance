@@ -668,17 +668,14 @@ function autoSchedule(body) {
         continue;
       }
 
-      // Continuity preference: keep the previous driver in the car if they're still
-      // eligible AND they haven't done more than 1 stint ahead of the least-driven
-      // eligible driver (stint-count fairness guard). Using stint count (not minutes)
-      // works correctly from the start of the race when other drivers are at 0.
-      const otherEligible = eligible.filter(n => n !== lastDriver);
-      const minOtherStints = otherEligible.length > 0
-        ? Math.min(...otherEligible.map(n => ds(n).stintCount))
-        : Infinity;
+      // Continuity preference: keep the previous driver in the car up to their
+      // personal maximum continuous block (enforced by canDriveAtAbs inside eligible),
+      // but only while their cumulative total won't exceed their fair share of the race.
+      const lastAv = lastDriver ? getLatestAvailability(lastDriver, availability) : null;
+      const lastStintDur = lastAv ? calcStintDuration(lastAv, team) : 0;
       const canContinue = lastDriver !== null &&
         eligible.includes(lastDriver) &&
-        ds(lastDriver).stintCount <= minOtherStints + 1;
+        ds(lastDriver).totalMin + lastStintDur <= target;
 
       // Sort: continuity first (when fair), then urgency → equity → iRating.
       eligible.sort((a, b) => {
