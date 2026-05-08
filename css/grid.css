@@ -397,6 +397,8 @@
 
 /* ============================================================
    Desktop — fit grid to viewport width
+   Slot widths are set via JS (applyFitWidth) to avoid
+   table-layout conflicts with writing-mode on header cells.
    ============================================================ */
 
 @media (min-width: 900px) {
@@ -405,25 +407,7 @@
   }
 
   .schedule-grid {
-    table-layout: fixed;
     width: 100%;
-  }
-
-  .grid-cell.label {
-    width: 130px;
-    min-width: 130px;
-    max-width: 130px;
-  }
-
-  .grid-cell.irating {
-    width: 46px;
-    min-width: 46px;
-    left: 130px;
-  }
-
-  .grid-cell.slot {
-    width: auto;
-    min-width: 0;
   }
 }
 

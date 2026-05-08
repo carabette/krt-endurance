@@ -204,6 +204,35 @@ const Schedule = (() => {
     `;
     wrapper.appendChild(legend);
     container.appendChild(wrapper);
+
+    // On desktop, compute slot widths from actual container size so header
+    // and body columns are guaranteed to align (avoids table-layout issues
+    // caused by writing-mode on the rotated header cells).
+    function applyFitWidth() {
+      if (window.innerWidth < 900) return;
+      const labelW   = 130;
+      const iratingW = 46;
+      const available = wrapper.clientWidth - labelW - iratingW;
+      const sw = Math.max(28, Math.floor(available / sorted.length));
+      wrapper.querySelectorAll('.grid-cell.slot').forEach(c => {
+        c.style.width    = sw + 'px';
+        c.style.minWidth = sw + 'px';
+      });
+    }
+
+    requestAnimationFrame(applyFitWidth);
+
+    // Keep aligned on window resize
+    const _onResize = () => applyFitWidth();
+    window.addEventListener('resize', _onResize);
+    // Clean up when grid is replaced
+    const observer = new MutationObserver(() => {
+      if (!wrapper.isConnected) {
+        window.removeEventListener('resize', _onResize);
+        observer.disconnect();
+      }
+    });
+    observer.observe(wrapper.parentElement || document.body, { childList: true });
   }
 
   function buildHeaderRow(labelText, slots, cellBuilderFn, showIrating = true) {
