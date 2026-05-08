@@ -46,5 +46,6 @@ const API = (() => {
     createRace: (data) => post({ action: 'createRace', ...data }),
     createDriver: (data) => post({ action: 'createDriver', ...data }),
     updateDriver: (data) => post({ action: 'updateDriver', ...data }),
+    selfRegisterDriver: (data) => post({ action: 'selfRegisterDriver', ...data }),
   };
 })();

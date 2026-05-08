@@ -60,19 +60,36 @@
           </select>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
-
-        <!-- Horário disponível -->
-        <div class="form-row">
-          <div class="form-group">
-            <label for="available-from">Disponível a partir de *</label>
-            <input type="time" id="available-from" required />
-            <span class="hint">Horário local</span>
+        <!-- Auto-cadastro -->
+        <div id="self-register-section" style="display:none;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius);padding:16px;margin-bottom:8px;">
+          <p style="font-size:12px;color:#666;margin-bottom:12px;">Informe seus dados para se cadastrar. Após cadastro, selecione seu nome na lista.</p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Seu nome *</label>
+              <input type="text" id="reg-name" placeholder="Nome completo" />
+            </div>
+            <div class="form-group">
+              <label>iRating (opcional)</label>
+              <input type="number" id="reg-irating" min="1" placeholder="Ex: 2026" />
+            </div>
           </div>
           <div class="form-group">
-            <label for="available-to">Disponível até *</label>
-            <input type="time" id="available-to" required />
-            <span class="hint">Horário local</span>
+            <label>Carros que você possui no iRacing</label>
+            <div id="reg-cars-container" style="border:1px solid var(--color-border);border-radius:var(--radius);padding:12px;max-height:200px;overflow-y:auto;background:var(--color-bg)">
+              <span style="font-size:12px;color:#aaa">Carregando lista de carros…</span>
+            </div>
+          </div>
+          <button type="button" class="btn btn-secondary" id="register-btn" style="width:100%;justify-content:center">Cadastrar</button>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
+
+        <!-- Slots de disponibilidade -->
+        <div id="slot-section" style="display:none">
+          <div class="form-group">
+            <label>Slots em que você estará disponível *</label>
+            <p style="font-size:12px;color:#888;margin:4px 0 10px">Marque todos os slots nos quais você pode dirigir.</p>
+            <div id="slot-grid" class="slot-grid"></div>
           </div>
         </div>
 
@@ -166,6 +183,7 @@
 </main>
 
 <script src="js/config.js"></script>
+<script src="js/cars.js"></script>
 <script src="js/api.js"></script>
 <script src="js/form.js"></script>
 

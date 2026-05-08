@@ -157,15 +157,13 @@
               <input type="number" id="d-irating" min="1" placeholder="Ex: 2026" />
             </div>
           </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Customer ID iRacing</label>
-              <input type="text" id="d-cid" placeholder="Ex: 723311" />
-            </div>
-            <div class="form-group">
-              <label>Carros disponíveis (IDs, vírgula)</label>
-              <input type="text" id="d-cars" placeholder="Ex: 154,72 (IDs iRacing)" />
-            </div>
+          <div class="form-group">
+            <label>Customer ID iRacing</label>
+            <input type="text" id="d-cid" placeholder="Ex: 723311" />
+          </div>
+          <div class="form-group">
+            <label>Carros disponíveis</label>
+            <div id="d-cars-container" style="border:1px solid var(--color-border);border-radius:var(--radius);padding:12px;max-height:220px;overflow-y:auto;background:var(--color-bg)"></div>
           </div>
           <button class="btn btn-primary" id="add-driver-btn">Adicionar Piloto</button>
         </div>
@@ -178,6 +176,29 @@
           <div id="drivers-list">
             <div class="loading"><div class="spinner"></div><span>Carregando…</span></div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         Gerenciar Corrida
+    ========================================================= -->
+    <div class="admin-section">
+      <h2>Gerenciar Corrida</h2>
+      <div class="card">
+        <div class="card-body">
+          <div class="form-group" style="max-width:400px;margin-bottom:16px">
+            <label>Corrida</label>
+            <select id="manage-race-select">
+              <option value="">Selecione…</option>
+            </select>
+          </div>
+          <div id="manage-feedback" style="margin-bottom:12px"></div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <button class="btn btn-secondary" id="btn-assign-teams">Alocar Equipes</button>
+            <button class="btn btn-primary" id="btn-auto-schedule">Gerar Cronograma</button>
+          </div>
+          <div id="manage-result" style="margin-top:12px"></div>
         </div>
       </div>
     </div>
@@ -205,7 +226,9 @@
   </div><!-- /#admin-content -->
 </main>
 
+<datalist id="cars-datalist"></datalist>
 <script src="js/config.js"></script>
+<script src="js/cars.js"></script>
 <script src="js/api.js"></script>
 <script>
 (async function () {
@@ -233,6 +256,8 @@
   async function initAdmin() {
     [drivers, races] = await Promise.all([loadDrivers(), loadRaces()]);
     populateRaceSelects(races);
+    if (window.populateCarDatalist) window.populateCarDatalist('cars-datalist');
+    if (window.renderCarCheckboxes) window.renderCarCheckboxes('d-cars-container', '');
   }
 
   // ============================================================
@@ -275,12 +300,13 @@
     const name = document.getElementById('d-name').value.trim();
     const irating = document.getElementById('d-irating').value;
     const cid = document.getElementById('d-cid').value.trim();
-    const cars = document.getElementById('d-cars').value.trim();
+    const cars = window.getSelectedCars ? window.getSelectedCars('d-cars-container') : '';
     if (!name) { alert('Informe o nome do piloto.'); return; }
     try {
       await API.createDriver({ name, irating, iracing_cid: cid, cars_available: cars, password: adminPassword });
       document.getElementById('driver-feedback').innerHTML = '<div class="alert alert-success">Piloto adicionado!</div>';
-      ['d-name','d-irating','d-cid','d-cars'].forEach(id => document.getElementById(id).value = '');
+      ['d-name','d-irating','d-cid'].forEach(id => document.getElementById(id).value = '');
+      if (window.renderCarCheckboxes) window.renderCarCheckboxes('d-cars-container', '');
       await loadDrivers();
     } catch (err) {
       document.getElementById('driver-feedback').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
@@ -296,15 +322,53 @@
   }
 
   function populateRaceSelects(raceList) {
-    const sel = document.getElementById('avail-race-select');
-    sel.innerHTML = '<option value="">Selecione…</option>';
-    (raceList || []).forEach(r => {
-      const o = document.createElement('option');
-      o.value = r.race_id;
-      o.textContent = `${r.race_name} — ${formatDate(r.race_date)}`;
-      sel.appendChild(o);
+    ['avail-race-select', 'manage-race-select'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '<option value="">Selecione…</option>';
+      (raceList || []).forEach(r => {
+        const o = document.createElement('option');
+        o.value = r.race_id;
+        o.textContent = `${r.race_name} — ${formatDate(r.race_date)}`;
+        sel.appendChild(o);
+      });
     });
   }
+
+  // ============================================================
+  // Gerenciar Corrida — Alocar + Cronograma
+  // ============================================================
+
+  document.getElementById('btn-assign-teams').addEventListener('click', async () => {
+    const raceId = document.getElementById('manage-race-select').value;
+    if (!raceId) { document.getElementById('manage-feedback').innerHTML = '<div class="alert alert-error">Selecione uma corrida.</div>'; return; }
+    const fb = document.getElementById('manage-feedback');
+    const res = document.getElementById('manage-result');
+    fb.innerHTML = ''; res.innerHTML = '';
+    try {
+      const result = await API.assignTeams({ race_id: raceId, password: adminPassword });
+      const lines = (result.assignments || []).map(a =>
+        `<strong>${a.team}</strong>: ${a.drivers.join(', ')} (iRating médio: ${a.avg_irating})`
+      ).join('<br>');
+      fb.innerHTML = '<div class="alert alert-success">Equipes alocadas!</div>';
+      res.innerHTML = `<div style="font-size:12px;line-height:1.8">${lines || 'Nenhum piloto alocado (sem disponibilidade cadastrada).'}</div>`;
+    } catch (err) {
+      fb.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    }
+  });
+
+  document.getElementById('btn-auto-schedule').addEventListener('click', async () => {
+    const raceId = document.getElementById('manage-race-select').value;
+    if (!raceId) { document.getElementById('manage-feedback').innerHTML = '<div class="alert alert-error">Selecione uma corrida.</div>'; return; }
+    const fb = document.getElementById('manage-feedback');
+    const res = document.getElementById('manage-result');
+    fb.innerHTML = ''; res.innerHTML = '';
+    try {
+      const result = await API.autoSchedule({ race_id: raceId, password: adminPassword });
+      fb.innerHTML = `<div class="alert alert-success">Cronograma gerado! ${result.slots_scheduled} slots agendados.</div>`;
+    } catch (err) {
+      fb.innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    }
+  });
 
   document.getElementById('avail-race-select').addEventListener('change', async function () {
     const raceId = this.value;
@@ -369,20 +433,14 @@
           <input type="text" name="team_name" placeholder="Ex: KRT" value="${data.team_name||''}" required />
         </div>
         <div class="form-group">
-          <label>Nome do carro *</label>
-          <input type="text" name="car_name" placeholder="Ex: Porsche 963 GTP" value="${data.car_name||''}" required />
-        </div>
-      </div>
-      <div class="form-row">
-        <div class="form-group">
-          <label>ID do carro iRacing</label>
-          <input type="text" name="iracing_car_id" placeholder="Ex: 154" value="${data.iracing_car_id||''}" />
-          <span class="hint">Usado para verificar quais pilotos têm o carro</span>
-        </div>
-        <div class="form-group">
           <label>Pilotos por equipe</label>
           <input type="number" name="num_drivers" min="1" max="10" placeholder="4" value="${data.num_drivers||4}" />
         </div>
+      </div>
+      <div class="form-group">
+        <label>Carro *</label>
+        <input type="text" name="car_name" list="cars-datalist" placeholder="Pesquisar carro…" value="${data.car_name||''}" required autocomplete="off" />
+        <span class="hint">Este nome deve coincidir com o carro selecionado pelos pilotos</span>
       </div>
       <div class="form-row-3">
         <div class="form-group">
@@ -403,23 +461,26 @@
   }
 
   // Start with 2 teams by default
-  addTeamBlock({ team_name: 'KRT', iracing_car_id: '' });
-  addTeamBlock({ team_name: 'KRT-992', iracing_car_id: '' });
+  addTeamBlock({ team_name: 'KRT', car_name: '' });
+  addTeamBlock({ team_name: 'KRT-992', car_name: '' });
 
   document.getElementById('create-race-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const feedback = document.getElementById('create-race-feedback');
 
     const teamBlocks = document.querySelectorAll('#teams-container .team-block');
-    const teams = [...teamBlocks].map(block => ({
+    const teams = [...teamBlocks].map(block => {
+      const carName = block.querySelector('[name=car_name]').value;
+      return {
       team_name: block.querySelector('[name=team_name]').value,
-      car_name: block.querySelector('[name=car_name]').value,
-      iracing_car_id: block.querySelector('[name=iracing_car_id]').value,
+      car_name: carName,
+      iracing_car_id: carName, // use car name as identifier for driver matching
       num_drivers: block.querySelector('[name=num_drivers]').value,
       fuel_capacity_liters: block.querySelector('[name=fuel_capacity_liters]').value,
       default_avg_laptime_sec: block.querySelector('[name=default_avg_laptime_sec]').value,
       default_avg_fuel_per_lap: block.querySelector('[name=default_avg_fuel_per_lap]').value,
-    }));
+    };
+  });
 
     if (teams.length === 0) { feedback.innerHTML = '<div class="alert alert-error">Adicione ao menos uma equipe.</div>'; return; }
 

@@ -24,6 +24,11 @@ function getSheet(name) {
   const ss = getSpreadsheet();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
+    // Fallback: busca case-insensitive em todas as abas (getSheetByName pode retornar null por cache)
+    const allSheets = ss.getSheets();
+    sheet = allSheets.find(s => s.getName().toLowerCase().trim() === name.toLowerCase().trim()) || null;
+  }
+  if (!sheet) {
     sheet = ss.insertSheet(name);
     initSheetHeaders(sheet, name);
   }
@@ -60,13 +65,32 @@ function sheetToObjects(sheet) {
   const headers = data[0];
   return data.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i]; });
+    headers.forEach((h, i) => {
+      const v = row[i];
+      // Google Sheets armazena time-only como Date com epoch 1899-12-30.
+      // Converte para "HH:MM" usando timezone do script (São Paulo).
+      if (v instanceof Date && v.getFullYear() < 1900) {
+        obj[h] = String(v.getHours()).padStart(2, '0') + ':' + String(v.getMinutes()).padStart(2, '0');
+      } else if (v instanceof Date) {
+        obj[h] = v.toISOString();
+      } else {
+        obj[h] = v;
+      }
+    });
     return obj;
   });
 }
 
 function objectsToRows(objects, headers) {
   return objects.map(obj => headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+}
+
+function ensureColumn(sheet, colName) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  if (!headers.includes(colName)) {
+    const newCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, newCol).setValue(colName).setFontWeight('bold');
+  }
 }
 
 function appendObject(sheet, obj) {
@@ -122,6 +146,7 @@ function doGet(e) {
       case 'getTeams':       return cors(getTeams(params.race_id));
       case 'getSchedule':    return cors(getSchedule(params.race_id));
       case 'getAvailability':return cors(getAvailability(params.race_id));
+      case 'debug':          return cors({ sheets: SpreadsheetApp.openById(SHEET_ID).getSheets().map(s => s.getName()) });
       default:               return cors({ error: 'Ação não encontrada: ' + action });
     }
   } catch (err) {
@@ -137,10 +162,11 @@ function dispatchWrite(body) {
       case 'assignTeams':        return cors(assignTeams(body));
       case 'autoSchedule':       return cors(autoSchedule(body));
       case 'updateSlot':         return cors(updateSlot(body));
-      case 'createRace':         return cors(createRace(body));
-      case 'createDriver':       return cors(createDriver(body));
-      case 'updateDriver':       return cors(updateDriver(body));
-      default:                   return cors({ error: 'Ação não encontrada: ' + action });
+      case 'createRace':          return cors(createRace(body));
+      case 'createDriver':        return cors(createDriver(body));
+      case 'updateDriver':        return cors(updateDriver(body));
+      case 'selfRegisterDriver':  return cors(selfRegisterDriver(body));
+      default:                    return cors({ error: 'Ação não encontrada: ' + action });
     }
   } catch (err) {
     return cors({ error: err.message });
@@ -164,6 +190,7 @@ function doPost(e) {
       case 'createRace':         return cors(createRace(body));
       case 'createDriver':       return cors(createDriver(body));
       case 'updateDriver':       return cors(updateDriver(body));
+      case 'selfRegisterDriver': return cors(selfRegisterDriver(body));
       default:                   return cors({ error: 'Ação não encontrada: ' + action });
     }
   } catch (err) {
@@ -325,6 +352,29 @@ function createDriver(body) {
   return { success: true };
 }
 
+function selfRegisterDriver(body) {
+  // Piloto se auto-cadastra usando a senha da corrida (não admin)
+  verifyRacePassword(body.race_id, body.password);
+  const name = String(body.name || '').trim();
+  if (!name) throw new Error('Nome obrigatório');
+
+  const sheet = getSheet(SHEETS.DRIVERS);
+  const existing = sheetToObjects(sheet);
+  if (existing.find(d => d.name.toLowerCase() === name.toLowerCase())) {
+    throw new Error('Piloto com esse nome já existe. Selecione seu nome na lista.');
+  }
+
+  appendObject(sheet, {
+    driver_id: generateUUID(),
+    name: name,
+    iracing_cid: body.iracing_cid || '',
+    irating: Number(body.irating) || 1500,
+    cars_available: body.cars_available || '',
+    active: true,
+  });
+  return { success: true, name };
+}
+
 function updateDriver(body) {
   verifyAdminPassword(body.password);
   const sheet = getSheet(SHEETS.DRIVERS);
@@ -362,13 +412,17 @@ function submitAvailability(body) {
     effectiveStint = Math.round(Math.floor(fuelCap / customFuel) * customLap / 60);
   }
 
-  appendObject(getSheet(SHEETS.AVAILABILITY), {
+  const availSheet = getSheet(SHEETS.AVAILABILITY);
+  ensureColumn(availSheet, 'slot_from');
+  ensureColumn(availSheet, 'slot_to');
+
+  appendObject(availSheet, {
     availability_id: generateUUID(),
     submitted_at: new Date().toISOString(),
     race_id: body.race_id,
     driver_name: body.driver_name,
-    available_from: body.available_from,
-    available_to: body.available_to,
+    available_from: body.available_from || '',
+    available_to: body.available_to || '',
     ok_rain: body.ok_rain === true || body.ok_rain === 'true',
     ok_night_sim: body.ok_night_sim === true || body.ok_night_sim === 'true',
     ok_night_real: body.ok_night_real === true || body.ok_night_real === 'true',
@@ -377,6 +431,8 @@ function submitAvailability(body) {
     custom_avg_laptime_sec: customLap || '',
     custom_avg_fuel_per_lap: customFuel || '',
     effective_stint_minutes: effectiveStint,
+    slot_from: Number(body.slot_from) || '',
+    slot_to: Number(body.slot_to) || '',
   });
   return { success: true };
 }
@@ -397,11 +453,11 @@ function assignTeams(body) {
   const availableDriverNames = [...new Set(availability.map(a => a.driver_name))];
   const availableDrivers = drivers.filter(d => availableDriverNames.includes(d.name));
 
-  // Para cada equipe, pilotos elegíveis = têm o carro
+  // Para cada equipe, pilotos elegíveis = têm o carro (comparação case-insensitive)
   const teamEligible = teams.map(team => {
-    const carId = String(team.iracing_car_id);
+    const carId = String(team.iracing_car_id || team.car_name || '').trim().toLowerCase();
     const eligible = availableDrivers.filter(d => {
-      const cars = String(d.cars_available).split(',').map(c => c.trim());
+      const cars = String(d.cars_available).split(',').map(c => c.trim().toLowerCase());
       return carId === '' || cars.includes(carId);
     }).sort((a, b) => Number(b.irating) - Number(a.irating));
     return { team, eligible, assigned: [], iRatingSum: 0 };
@@ -492,9 +548,16 @@ function autoSchedule(body) {
         const avail = getLatestAvailability(driverName, availability);
         if (!avail) return false;
 
-        const fromMin = timeToMinutes(avail.available_from);
-        const toMin = timeToMinutes(avail.available_to);
-        const available = timeRangeContains(fromMin, toMin, slotStartMin, slotEndMin);
+        let available;
+        const fromSlot = Number(avail.slot_from) || 0;
+        const toSlot = Number(avail.slot_to) || 0;
+        if (fromSlot > 0 && toSlot > 0) {
+          available = Number(slot.slot_number) >= fromSlot && Number(slot.slot_number) <= toSlot;
+        } else {
+          const fromMin = timeToMinutes(avail.available_from);
+          const toMin = timeToMinutes(avail.available_to);
+          available = timeRangeContains(fromMin, toMin, slotStartMin, slotEndMin);
+        }
         if (!available) return false;
         if (isRain && !toBool(avail.ok_rain)) return false;
         if (toBool(slot.is_night_sim) && !toBool(avail.ok_night_sim)) return false;
@@ -629,6 +692,10 @@ function updateSlot(body) {
 // ============================================================
 
 function verifyRacePassword(raceId, password) {
+  // Admin password bypasses the team password check
+  const props = PropertiesService.getScriptProperties();
+  const adminPass = props.getProperty('ADMIN_PASSWORD') || 'krt2024';
+  if (String(password) === String(adminPass)) return;
   const races = sheetToObjects(getSheet(SHEETS.RACES));
   const race = races.find(r => r.race_id === raceId);
   if (!race) throw new Error('Corrida não encontrada');
