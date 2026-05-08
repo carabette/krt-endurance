@@ -1,0 +1,429 @@
+/* ============================================================
+   KRT Endurance — Grade de Stints
+   ============================================================ */
+
+.schedule-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.schedule-grid {
+  display: table;
+  border-collapse: collapse;
+  min-width: 100%;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* ============================================================
+   Header rows (times, sim times, rain)
+   ============================================================ */
+
+.grid-header-group {
+  display: table-header-group;
+}
+
+.grid-row {
+  display: table-row;
+}
+
+.grid-cell {
+  display: table-cell;
+  vertical-align: middle;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+/* Label cell (leftmost, driver name / row label) */
+.grid-cell.label {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background: var(--color-surface);
+  min-width: 120px;
+  max-width: 150px;
+  padding: 4px 10px;
+  font-weight: 600;
+  font-size: 12px;
+  border-right: 2px solid var(--color-border);
+}
+
+/* iRating column */
+.grid-cell.irating {
+  position: sticky;
+  left: 120px;
+  z-index: 10;
+  background: var(--color-surface);
+  min-width: 52px;
+  padding: 4px 6px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  border-right: 2px solid var(--color-border);
+}
+
+/* Slot cells */
+.grid-cell.slot {
+  min-width: 80px;
+  width: 80px;
+  text-align: center;
+  padding: 0;
+  position: relative;
+}
+
+/* ============================================================
+   Header row content
+   ============================================================ */
+
+.grid-header-group .grid-row {
+  background: var(--color-bg);
+}
+
+.grid-header-group .grid-cell.label {
+  background: var(--color-bg);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-secondary);
+}
+
+/* Time cells in header */
+.time-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 2px;
+  line-height: 1.3;
+}
+
+.time-cell .local {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.time-cell .sim {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+}
+
+/* Night indicator */
+.slot-night {
+  background: #f0f0f8 !important;
+}
+
+.slot-night .local {
+  color: var(--color-night);
+}
+
+/* Rain row */
+.rain-row .grid-cell.slot {
+  padding: 3px 4px;
+}
+
+.rain-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+}
+
+.rain-pct {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.rain-bar-cell {
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+}
+
+.rain-0  { background: #e8f5e9; }
+.rain-1  { background: #a5d6a7; }
+.rain-2  { background: #81c784; }
+.rain-10 { background: #ffcc02; }
+.rain-15 { background: #ff9800; }
+.rain-20 { background: #f57c00; }
+.rain-30 { background: #f44336; }
+
+/* ============================================================
+   Team separator row
+   ============================================================ */
+
+.team-separator .grid-cell {
+  background: #f0f0f0;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 5px 10px;
+  border-top: 2px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.team-separator.team-1 .grid-cell {
+  background: var(--color-team-1-light);
+  border-top-color: var(--color-team-1-dark);
+  color: #6b5a20;
+}
+
+.team-separator.team-2 .grid-cell {
+  background: var(--color-team-2-light);
+  border-top-color: var(--color-team-2-dark);
+  color: #7a7010;
+}
+
+/* ============================================================
+   Driver rows / stint cells
+   ============================================================ */
+
+.driver-row .grid-cell.label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.driver-row .grid-cell.label .driver-name {
+  flex: 1;
+}
+
+/* Stint cell states */
+.stint-cell {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  cursor: default;
+  position: relative;
+  transition: filter 0.1s;
+}
+
+.stint-cell:hover {
+  filter: brightness(0.95);
+}
+
+/* Available (piloto disponível mas sem stint) */
+.stint-available {
+  background: transparent;
+}
+
+/* Active stint */
+.stint-active {
+  border-radius: 2px;
+  margin: 2px;
+  width: calc(100% - 4px);
+  height: calc(100% - 4px);
+}
+
+.stint-active.team-1 {
+  background: var(--color-team-1);
+  color: #4a3800;
+  border-left: 3px solid var(--color-team-1-dark);
+}
+
+.stint-active.team-2 {
+  background: var(--color-team-2);
+  color: #5a5000;
+  border-left: 3px solid var(--color-team-2-dark);
+}
+
+/* Backup */
+.stint-backup {
+  background: transparent;
+  border: 1.5px dashed var(--color-backup);
+  border-radius: 2px;
+  margin: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  color: var(--color-backup);
+  font-size: 10px;
+}
+
+/* Unavailable */
+.stint-unavailable {
+  background: #f5f5f5;
+  color: #ccc;
+}
+
+/* Multi-slot stint (connected cells) */
+.stint-continue {
+  border-radius: 0;
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.stint-start {
+  border-radius: 2px 0 0 2px;
+  margin-right: 0;
+}
+
+.stint-end {
+  border-radius: 0 2px 2px 0;
+  margin-left: 0;
+}
+
+/* Rain overlay on stint */
+.stint-rain-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(33, 150, 243, 0.4);
+  border-radius: 0 0 2px 2px;
+}
+
+/* Night overlay */
+.stint-night-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 6px;
+  background: var(--color-night);
+  border-radius: 0 0 0 4px;
+  opacity: 0.5;
+}
+
+/* ============================================================
+   Legend
+   ============================================================ */
+
+.schedule-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  font-size: 12px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-box {
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.legend-box.stint-active-t1  { background: var(--color-team-1); border-left: 3px solid var(--color-team-1-dark); }
+.legend-box.stint-active-t2  { background: var(--color-team-2); border-left: 3px solid var(--color-team-2-dark); }
+.legend-box.stint-backup-l   { background: transparent; border: 1.5px dashed var(--color-backup); }
+.legend-box.stint-unavail-l  { background: #f5f5f5; border: 1px solid #ddd; }
+
+/* ============================================================
+   Detail table below grid
+   ============================================================ */
+
+.detail-table-wrap {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.detail-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.detail-table th {
+  padding: 6px 10px;
+  background: var(--color-bg);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--color-text-secondary);
+  border-bottom: 2px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.detail-table td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.detail-table .team-header td {
+  background: var(--color-team-1-light);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #5a4010;
+}
+
+.detail-table .team-header.t2 td {
+  background: var(--color-team-2-light);
+  color: #605a10;
+}
+
+.detail-table .rain-high td { background: #fff3f3; }
+.detail-table .rain-mid  td { background: #fffaf0; }
+
+/* Rain pct color in table */
+.pct-low  { color: var(--color-rain-low); font-weight: 700; }
+.pct-mid  { color: #e65100; font-weight: 700; }
+.pct-high { color: var(--color-rain-high); font-weight: 700; }
+
+/* ============================================================
+   Edit overlay
+   ============================================================ */
+
+.slot-edit-btn {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  background: rgba(255,255,255,0.85);
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 10px;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.stint-cell:hover .slot-edit-btn {
+  display: inline-flex;
+}
+
+/* ============================================================
+   Mobile
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .grid-cell.irating {
+    display: none;
+  }
+
+  .stint-cell {
+    font-size: 10px;
+    height: 30px;
+  }
+
+  .grid-cell.slot {
+    min-width: 60px;
+    width: 60px;
+  }
+}

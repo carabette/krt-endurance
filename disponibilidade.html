@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KRT Endurance — Disponibilidade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <img src="assets/krt-logo.png" class="logo" alt="KRT" onerror="this.style.display='none'" />
+    <span class="logo-text">KRT <span>Endurance</span></span>
+    <nav class="site-nav">
+      <a href="index.html" class="btn btn-secondary">
+        <span>📋</span> <span>Cronograma</span>
+      </a>
+      <a href="disponibilidade.html" class="btn btn-primary">
+        <span>✍️</span> <span>Disponibilidade</span>
+      </a>
+      <a href="admin.html" class="btn btn-secondary">
+        <span>⚙️</span> <span>Admin</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="container page-content">
+  <div style="max-width:640px;margin:0 auto;">
+
+    <h1 style="font-size:20px;font-weight:700;margin-bottom:4px;">Disponibilidade do Piloto</h1>
+    <p style="color:#666;font-size:13px;margin-bottom:24px;">
+      Preencha seus horários disponíveis e preferências para a corrida selecionada.
+    </p>
+
+    <div id="form-feedback"></div>
+
+    <form id="availability-form" class="card" novalidate>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:0">
+
+        <!-- Corrida -->
+        <div class="form-group">
+          <label for="race-select">Corrida *</label>
+          <select id="race-select" required>
+            <option value="">Carregando…</option>
+          </select>
+        </div>
+
+        <!-- Info da corrida -->
+        <div id="race-info" style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666;font-family:var(--font-mono);margin-bottom:16px;min-height:18px;"></div>
+
+        <!-- Piloto -->
+        <div class="form-group">
+          <label for="driver-select">Piloto *</label>
+          <select id="driver-select" required>
+            <option value="">Carregando…</option>
+          </select>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
+
+        <!-- Horário disponível -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="available-from">Disponível a partir de *</label>
+            <input type="time" id="available-from" required />
+            <span class="hint">Horário local</span>
+          </div>
+          <div class="form-group">
+            <label for="available-to">Disponível até *</label>
+            <input type="time" id="available-to" required />
+            <span class="hint">Horário local</span>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
+
+        <!-- Preferências de condições -->
+        <div class="form-group">
+          <label>Condições aceitas</label>
+          <div class="toggle-group" style="margin-top:8px">
+            <div class="toggle-item">
+              <label class="toggle">
+                <input type="checkbox" id="ok-rain" />
+                <span class="toggle-slider"></span>
+              </label>
+              <label for="ok-rain">🌧 OK com chuva</label>
+            </div>
+            <div class="toggle-item">
+              <label class="toggle">
+                <input type="checkbox" id="ok-night-sim" />
+                <span class="toggle-slider"></span>
+              </label>
+              <label for="ok-night-sim">🌙 Noite no simulador</label>
+            </div>
+            <div class="toggle-item">
+              <label class="toggle">
+                <input type="checkbox" id="ok-night-real" />
+                <span class="toggle-slider"></span>
+              </label>
+              <label for="ok-night-real">🌃 Noite (horário real)</label>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
+
+        <!-- Tempo máximo e descanso -->
+        <div class="form-row">
+          <div class="form-group">
+            <label for="max-stint">Tempo máximo no carro (horas) *</label>
+            <input type="number" id="max-stint" min="0.5" max="6" step="0.5" placeholder="Ex: 2" required />
+            <span class="hint">Máximo de horas contínuas dirigindo</span>
+          </div>
+          <div class="form-group">
+            <label for="min-rest">Descanso mínimo entre stints (horas) *</label>
+            <input type="number" id="min-rest" min="0" max="4" step="0.5" placeholder="Ex: 1" required />
+            <span class="hint">Horas de descanso antes de um próximo stint</span>
+          </div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:8px 0 16px" />
+
+        <!-- Dados opcionais de pilotagem -->
+        <button type="button" class="collapsible-toggle" id="collapsible-btn">
+          <span>⚙ Dados de pilotagem (opcional)</span>
+          <span class="arrow">▼</span>
+        </button>
+        <div class="collapsible-body" id="collapsible-body">
+          <p style="font-size:12px;color:#888;margin-bottom:12px;">
+            Se você conhece seus dados de consumo, informe aqui para um cálculo de stint personalizado.
+            Caso contrário, o padrão do carro será utilizado.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="custom-laptime">Tempo de volta médio (segundos)</label>
+              <input type="number" id="custom-laptime" min="30" max="600" step="0.1" placeholder="Ex: 118.5" />
+            </div>
+            <div class="form-group">
+              <label for="custom-fuel">Consumo médio (L/volta)</label>
+              <input type="number" id="custom-fuel" min="0.1" max="20" step="0.01" placeholder="Ex: 3.2" />
+            </div>
+          </div>
+          <div id="stint-preview" class="stint-preview"></div>
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--color-border);margin:16px 0" />
+
+        <!-- Senha -->
+        <div class="form-group">
+          <label for="password">Senha do time *</label>
+          <input type="password" id="password" required placeholder="Senha fornecida pelo admin" />
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;justify-content:center;">
+          Enviar Disponibilidade
+        </button>
+
+      </div>
+    </form>
+
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/form.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KRT Endurance — Cronograma de Stints</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/grid.css" />
+</head>
+<body>
+
+<!-- ============================================================
+     Header
+============================================================ -->
+<header class="site-header">
+  <div class="inner">
+    <img src="assets/krt-logo.png" class="logo" alt="KRT" onerror="this.style.display='none'" />
+    <span class="logo-text">KRT <span>Endurance</span></span>
+    <nav class="site-nav">
+      <a href="index.html" class="btn btn-primary">
+        <span>📋</span> <span>Cronograma</span>
+      </a>
+      <a href="disponibilidade.html" class="btn btn-secondary">
+        <span>✍️</span> <span>Disponibilidade</span>
+      </a>
+      <a href="admin.html" class="btn btn-secondary">
+        <span>⚙️</span> <span>Admin</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<!-- ============================================================
+     Race Selector
+============================================================ -->
+<div class="race-selector">
+  <label for="race-select">Corrida:</label>
+  <select id="race-select">
+    <option value="">Carregando corridas…</option>
+  </select>
+  <div class="race-meta" id="race-meta"></div>
+</div>
+
+<!-- ============================================================
+     Main Content
+============================================================ -->
+<main class="container page-content">
+
+  <!-- Feedback -->
+  <div id="page-feedback"></div>
+
+  <!-- Schedule Grid -->
+  <div id="schedule-container">
+    <div class="loading">
+      <div class="spinner"></div>
+      <span>Selecione uma corrida para visualizar o cronograma.</span>
+    </div>
+  </div>
+
+  <!-- Detail Table -->
+  <div id="detail-container"></div>
+
+</main>
+
+<!-- ============================================================
+     Admin Panel
+============================================================ -->
+<div id="admin-panel" style="display:none;">
+  <div class="container">
+    <div class="admin-panel card" style="margin-top:24px">
+      <div class="admin-title">Painel Admin</div>
+      <div class="admin-actions">
+        <div class="password-prompt">
+          <label style="font-size:12px;margin:0">Senha:</label>
+          <input type="password" id="admin-password" placeholder="Senha da corrida" />
+        </div>
+        <button class="btn btn-secondary" id="btn-assign-teams">
+          👥 Alocar Equipes
+        </button>
+        <button class="btn btn-primary" id="btn-auto-schedule">
+          🚀 Gerar Cronograma
+        </button>
+        <button class="btn btn-secondary" id="btn-refresh">
+          🔄 Atualizar
+        </button>
+      </div>
+      <div id="admin-feedback" style="margin-top:12px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Admin toggle (small link at bottom) -->
+<div style="text-align:center;padding:16px;font-size:12px;color:#aaa">
+  <a href="#" id="toggle-admin" style="color:#ccc">⚙ Admin</a>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/schedule.js"></script>
+<script>
+(async function () {
+  const raceSelect       = document.getElementById('race-select');
+  const raceMeta         = document.getElementById('race-meta');
+  const scheduleContainer = document.getElementById('schedule-container');
+  const detailContainer  = document.getElementById('detail-container');
+  const pageFeedback     = document.getElementById('page-feedback');
+  const adminPanel       = document.getElementById('admin-panel');
+  const adminFeedback    = document.getElementById('admin-feedback');
+  const toggleAdmin      = document.getElementById('toggle-admin');
+
+  let currentRaceId = null;
+  let currentRaceData = null;
+
+  // ============================================================
+  // Admin toggle
+  // ============================================================
+  let adminVisible = false;
+  toggleAdmin.addEventListener('click', (e) => {
+    e.preventDefault();
+    adminVisible = !adminVisible;
+    adminPanel.style.display = adminVisible ? 'block' : 'none';
+    if (adminVisible) adminPanel.classList.add('unlocked');
+  });
+
+  // ============================================================
+  // Load races
+  // ============================================================
+  try {
+    const races = await API.getRaces();
+    if (!races || races.length === 0) {
+      raceSelect.innerHTML = '<option value="">Nenhuma corrida cadastrada</option>';
+    } else {
+      raceSelect.innerHTML = '<option value="">Selecione uma corrida…</option>';
+      races
+        .filter(r => r.status !== 'completed')
+        .sort((a, b) => new Date(b.race_date) - new Date(a.race_date))
+        .forEach(r => {
+          const opt = document.createElement('option');
+          opt.value = r.race_id;
+          const badgeText = r.status === 'open' ? '🟢' : r.status === 'scheduled' ? '🔵' : '⚪';
+          opt.textContent = `${badgeText} ${r.race_name} — ${formatDate(r.race_date)}`;
+          raceSelect.appendChild(opt);
+        });
+
+      // Se só tiver uma, seleciona automaticamente
+      if (races.filter(r => r.status !== 'completed').length === 1) {
+        raceSelect.selectedIndex = 1;
+        raceSelect.dispatchEvent(new Event('change'));
+      }
+    }
+  } catch (err) {
+    showPageFeedback('error', 'Erro ao carregar corridas: ' + err.message);
+  }
+
+  // ============================================================
+  // Race change
+  // ============================================================
+  raceSelect.addEventListener('change', () => {
+    currentRaceId = raceSelect.value;
+    if (!currentRaceId) {
+      scheduleContainer.innerHTML = '<div class="loading"><span>Selecione uma corrida.</span></div>';
+      detailContainer.innerHTML = '';
+      raceMeta.innerHTML = '';
+      return;
+    }
+    loadSchedule();
+  });
+
+  // ============================================================
+  // Load & render schedule
+  // ============================================================
+  window.loadSchedule = async function () {
+    if (!currentRaceId) return;
+    scheduleContainer.innerHTML = '<div class="loading"><div class="spinner"></div><span>Carregando cronograma…</span></div>';
+    try {
+      const [detail, scheduleData] = await Promise.all([
+        API.getRaceDetail(currentRaceId),
+        API.getSchedule(currentRaceId),
+      ]);
+
+      currentRaceData = detail;
+      const { race, timeslots, teams } = detail;
+      const { schedule, assignments } = scheduleData;
+
+      // Update race meta bar
+      raceMeta.innerHTML = `
+        <span>📅 ${formatDate(race.race_date)}</span>
+        <span>⏱ ${race.race_duration_hours}h</span>
+        <span>🕐 Início: ${race.local_start_time} (local) / ${race.sim_start_time} (sim)</span>
+        <span>${badgeHtml(race.status)}</span>
+      `;
+
+      Schedule.renderGrid(scheduleContainer, race, timeslots, teams, schedule, assignments);
+      Schedule.renderDetailTable(detailContainer, teams, schedule, timeslots);
+
+    } catch (err) {
+      scheduleContainer.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+    }
+  };
+
+  // ============================================================
+  // Admin actions
+  // ============================================================
+  document.getElementById('btn-assign-teams')?.addEventListener('click', async () => {
+    if (!currentRaceId) { alert('Selecione uma corrida.'); return; }
+    const password = document.getElementById('admin-password').value;
+    if (!password) { alert('Informe a senha.'); return; }
+    try {
+      adminFeedback.innerHTML = '<div class="alert alert-info">Alocando equipes…</div>';
+      const result = await API.assignTeams({ race_id: currentRaceId, password });
+      const lines = result.assignments.map(a =>
+        `<strong>${a.team}</strong>: ${a.drivers.join(', ')} (iR médio: ${a.avg_irating})`
+      ).join('<br>');
+      adminFeedback.innerHTML = `<div class="alert alert-success">Equipes alocadas:<br>${lines}</div>`;
+      await loadSchedule();
+    } catch (err) {
+      adminFeedback.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+    }
+  });
+
+  document.getElementById('btn-auto-schedule')?.addEventListener('click', async () => {
+    if (!currentRaceId) { alert('Selecione uma corrida.'); return; }
+    const password = document.getElementById('admin-password').value;
+    if (!password) { alert('Informe a senha.'); return; }
+    try {
+      adminFeedback.innerHTML = '<div class="alert alert-info">Gerando cronograma…</div>';
+      const result = await API.autoSchedule({ race_id: currentRaceId, password });
+      adminFeedback.innerHTML = `<div class="alert alert-success">${result.slots_scheduled} slots agendados com sucesso.</div>`;
+      await loadSchedule();
+    } catch (err) {
+      adminFeedback.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+    }
+  });
+
+  document.getElementById('btn-refresh')?.addEventListener('click', () => loadSchedule());
+
+  // ============================================================
+  // Helpers
+  // ============================================================
+  function showPageFeedback(type, msg) {
+    pageFeedback.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  }
+
+  function formatDate(val) {
+    if (!val) return '—';
+    try { return new Date(val).toLocaleDateString('pt-BR'); } catch (_) { return String(val); }
+  }
+
+  function badgeHtml(status) {
+    const map = { open: 'badge-open', scheduled: 'badge-scheduled', completed: 'badge-completed' };
+    const labels = { open: 'Aberta', scheduled: 'Agendada', completed: 'Finalizada' };
+    return `<span class="badge ${map[status] || ''}">${labels[status] || status}</span>`;
+  }
+})();
+</script>
+
+</body>
+</html>

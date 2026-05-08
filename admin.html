@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KRT Endurance — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .admin-section { margin-bottom: 32px; }
+    .admin-section h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--color-team-1); }
+    .team-block { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; position: relative; }
+    .remove-team { position: absolute; top: 8px; right: 8px; background: none; border: none; cursor: pointer; font-size: 16px; color: #aaa; }
+    .remove-team:hover { color: #f44336; }
+    #teams-container .team-block .team-title { font-weight: 700; font-size: 13px; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="inner">
+    <img src="assets/krt-logo.png" class="logo" alt="KRT" onerror="this.style.display='none'" />
+    <span class="logo-text">KRT <span>Endurance</span></span>
+    <nav class="site-nav">
+      <a href="index.html" class="btn btn-secondary"><span>📋</span> <span>Cronograma</span></a>
+      <a href="disponibilidade.html" class="btn btn-secondary"><span>✍️</span> <span>Disponibilidade</span></a>
+      <a href="admin.html" class="btn btn-primary"><span>⚙️</span> <span>Admin</span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="container page-content" style="max-width:860px;">
+
+  <div id="admin-gate">
+    <div class="card" style="max-width:380px;margin:40px auto;">
+      <div class="card-header">Acesso Admin</div>
+      <div class="card-body">
+        <div class="form-group">
+          <label for="gate-password">Senha de admin</label>
+          <input type="password" id="gate-password" placeholder="Senha de administrador" />
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center" id="gate-btn">Entrar</button>
+        <div id="gate-feedback" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-content" style="display:none">
+
+    <!-- ========================================================
+         Nova Corrida
+    ========================================================= -->
+    <div class="admin-section">
+      <h2>Nova Corrida</h2>
+      <div class="card">
+        <div class="card-body">
+          <div id="create-race-feedback"></div>
+          <form id="create-race-form" novalidate>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nome da corrida *</label>
+                <input type="text" id="r-name" placeholder="Ex: Nürburgring 24H — Timeslot #3" required />
+              </div>
+              <div class="form-group">
+                <label>Data *</label>
+                <input type="date" id="r-date" required />
+              </div>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Hora início (local) *</label>
+                <input type="time" id="r-local-start" required />
+              </div>
+              <div class="form-group">
+                <label>Hora início (simulador) *</label>
+                <input type="time" id="r-sim-start" required />
+              </div>
+              <div class="form-group">
+                <label>Duração (horas) *</label>
+                <input type="number" id="r-duration" min="1" max="48" step="0.5" placeholder="24" required />
+              </div>
+            </div>
+
+            <div class="form-row-3">
+              <div class="form-group">
+                <label>Duração padrão do slot (min)</label>
+                <input type="number" id="r-slot-dur" min="10" max="120" step="5" placeholder="60" />
+              </div>
+              <div class="form-group">
+                <label>% chuva para marcar slot</label>
+                <input type="number" id="r-rain-thresh" min="0" max="100" placeholder="10" />
+              </div>
+              <div class="form-group">
+                <label>Senha para pilotos *</label>
+                <input type="text" id="r-password" required placeholder="Ex: krt2025" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Noite início (sim)</label>
+                <input type="time" id="r-night-sim-start" />
+              </div>
+              <div class="form-group">
+                <label>Noite fim (sim)</label>
+                <input type="time" id="r-night-sim-end" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label>Noite início (real)</label>
+                <input type="time" id="r-night-real-start" />
+              </div>
+              <div class="form-group">
+                <label>Noite fim (real)</label>
+                <input type="time" id="r-night-real-end" />
+              </div>
+            </div>
+
+            <!-- Teams -->
+            <div style="margin:16px 0 8px;font-weight:600;font-size:13px;">Equipes</div>
+            <div id="teams-container"></div>
+            <button type="button" class="btn btn-secondary" id="add-team-btn" style="margin-bottom:16px">
+              + Adicionar Equipe
+            </button>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:12px">
+              Criar Corrida
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         Pilotos
+    ========================================================= -->
+    <div class="admin-section">
+      <h2>Pilotos</h2>
+
+      <!-- Add driver -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">Adicionar Piloto</div>
+        <div class="card-body">
+          <div id="driver-feedback"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nome</label>
+              <input type="text" id="d-name" placeholder="Nome completo" />
+            </div>
+            <div class="form-group">
+              <label>iRating</label>
+              <input type="number" id="d-irating" min="1" placeholder="Ex: 2026" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Customer ID iRacing</label>
+              <input type="text" id="d-cid" placeholder="Ex: 723311" />
+            </div>
+            <div class="form-group">
+              <label>Carros disponíveis (IDs, vírgula)</label>
+              <input type="text" id="d-cars" placeholder="Ex: 154,72 (IDs iRacing)" />
+            </div>
+          </div>
+          <button class="btn btn-primary" id="add-driver-btn">Adicionar Piloto</button>
+        </div>
+      </div>
+
+      <!-- Drivers list -->
+      <div class="card">
+        <div class="card-header">Pilotos cadastrados</div>
+        <div class="card-body" style="padding:0">
+          <div id="drivers-list">
+            <div class="loading"><div class="spinner"></div><span>Carregando…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         Disponibilidade por corrida
+    ========================================================= -->
+    <div class="admin-section">
+      <h2>Disponibilidade Submetida</h2>
+      <div class="form-group" style="max-width:400px">
+        <label>Corrida</label>
+        <select id="avail-race-select">
+          <option value="">Selecione…</option>
+        </select>
+      </div>
+      <div class="card">
+        <div class="card-body" style="padding:0">
+          <div id="avail-list">
+            <div style="padding:24px;text-align:center;color:#aaa;font-size:13px">Selecione uma corrida acima.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /#admin-content -->
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script>
+(async function () {
+  let adminPassword = '';
+  let drivers = [];
+  let races = [];
+
+  // ============================================================
+  // Gate
+  // ============================================================
+  document.getElementById('gate-btn').addEventListener('click', async () => {
+    const pass = document.getElementById('gate-password').value;
+    if (!pass) return;
+    // Simple validation: try to list drivers (always public) — just unlock the UI
+    adminPassword = pass;
+    document.getElementById('admin-gate').style.display = 'none';
+    document.getElementById('admin-content').style.display = 'block';
+    await initAdmin();
+  });
+
+  document.getElementById('gate-password').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('gate-btn').click();
+  });
+
+  async function initAdmin() {
+    [drivers, races] = await Promise.all([loadDrivers(), loadRaces()]);
+    populateRaceSelects(races);
+  }
+
+  // ============================================================
+  // Drivers
+  // ============================================================
+  async function loadDrivers() {
+    try {
+      const list = await API.getDrivers();
+      renderDriversTable(list);
+      return list;
+    } catch (err) {
+      document.getElementById('drivers-list').innerHTML = `<div class="alert alert-error" style="margin:12px">${err.message}</div>`;
+      return [];
+    }
+  }
+
+  function renderDriversTable(list) {
+    const el = document.getElementById('drivers-list');
+    if (!list || list.length === 0) {
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:13px">Nenhum piloto cadastrado.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table class="data-table">
+        <thead><tr>
+          <th>Nome</th><th>iRating</th><th>CID iRacing</th><th>Carros disponíveis</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(d => `<tr>
+            <td>${d.name}</td>
+            <td>${d.irating}</td>
+            <td>${d.iracing_cid || '—'}</td>
+            <td>${d.cars_available || '—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  document.getElementById('add-driver-btn').addEventListener('click', async () => {
+    const name = document.getElementById('d-name').value.trim();
+    const irating = document.getElementById('d-irating').value;
+    const cid = document.getElementById('d-cid').value.trim();
+    const cars = document.getElementById('d-cars').value.trim();
+    if (!name) { alert('Informe o nome do piloto.'); return; }
+    try {
+      await API.createDriver({ name, irating, iracing_cid: cid, cars_available: cars, password: adminPassword });
+      document.getElementById('driver-feedback').innerHTML = '<div class="alert alert-success">Piloto adicionado!</div>';
+      ['d-name','d-irating','d-cid','d-cars'].forEach(id => document.getElementById(id).value = '');
+      await loadDrivers();
+    } catch (err) {
+      document.getElementById('driver-feedback').innerHTML = `<div class="alert alert-error">${err.message}</div>`;
+    }
+  });
+
+  // ============================================================
+  // Races
+  // ============================================================
+  async function loadRaces() {
+    try { return await API.getRaces(); }
+    catch (_) { return []; }
+  }
+
+  function populateRaceSelects(raceList) {
+    const sel = document.getElementById('avail-race-select');
+    sel.innerHTML = '<option value="">Selecione…</option>';
+    (raceList || []).forEach(r => {
+      const o = document.createElement('option');
+      o.value = r.race_id;
+      o.textContent = `${r.race_name} — ${formatDate(r.race_date)}`;
+      sel.appendChild(o);
+    });
+  }
+
+  document.getElementById('avail-race-select').addEventListener('change', async function () {
+    const raceId = this.value;
+    if (!raceId) return;
+    try {
+      const avail = await API.getAvailability(raceId);
+      renderAvailabilityTable(avail);
+    } catch (err) {
+      document.getElementById('avail-list').innerHTML = `<div class="alert alert-error" style="margin:12px">${err.message}</div>`;
+    }
+  });
+
+  function renderAvailabilityTable(list) {
+    const el = document.getElementById('avail-list');
+    if (!list || list.length === 0) {
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:#aaa;font-size:13px">Nenhuma disponibilidade submetida.</div>';
+      return;
+    }
+    el.innerHTML = `
+      <table class="data-table" style="font-size:11px">
+        <thead><tr>
+          <th>Piloto</th><th>De</th><th>Até</th><th>Chuva</th><th>Noite Sim</th><th>Noite Real</th>
+          <th>Máx. Stint</th><th>Desc. Mín.</th><th>Stint Est.</th><th>Enviado em</th>
+        </tr></thead>
+        <tbody>
+          ${list.map(a => `<tr>
+            <td>${a.driver_name}</td>
+            <td>${a.available_from}</td>
+            <td>${a.available_to}</td>
+            <td>${boolIcon(a.ok_rain)}</td>
+            <td>${boolIcon(a.ok_night_sim)}</td>
+            <td>${boolIcon(a.ok_night_real)}</td>
+            <td>${a.max_stint_minutes} min</td>
+            <td>${a.min_rest_minutes} min</td>
+            <td>${a.effective_stint_minutes} min</td>
+            <td>${formatDateTime(a.submitted_at)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  // ============================================================
+  // Create Race
+  // ============================================================
+  let teamCount = 0;
+
+  document.getElementById('add-team-btn').addEventListener('click', () => addTeamBlock());
+
+  function addTeamBlock(data = {}) {
+    teamCount++;
+    const idx = teamCount;
+    const container = document.getElementById('teams-container');
+    const div = document.createElement('div');
+    div.className = 'team-block';
+    div.dataset.teamIdx = idx;
+    div.innerHTML = `
+      <button type="button" class="remove-team" onclick="this.closest('.team-block').remove()">✕</button>
+      <div class="team-title">Equipe ${idx}</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nome da equipe *</label>
+          <input type="text" name="team_name" placeholder="Ex: KRT" value="${data.team_name||''}" required />
+        </div>
+        <div class="form-group">
+          <label>Nome do carro *</label>
+          <input type="text" name="car_name" placeholder="Ex: Porsche 963 GTP" value="${data.car_name||''}" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ID do carro iRacing</label>
+          <input type="text" name="iracing_car_id" placeholder="Ex: 154" value="${data.iracing_car_id||''}" />
+          <span class="hint">Usado para verificar quais pilotos têm o carro</span>
+        </div>
+        <div class="form-group">
+          <label>Pilotos por equipe</label>
+          <input type="number" name="num_drivers" min="1" max="10" placeholder="4" value="${data.num_drivers||4}" />
+        </div>
+      </div>
+      <div class="form-row-3">
+        <div class="form-group">
+          <label>Capacidade do tanque (L) *</label>
+          <input type="number" name="fuel_capacity_liters" min="1" step="0.1" placeholder="Ex: 70" value="${data.fuel_capacity_liters||''}" required />
+        </div>
+        <div class="form-group">
+          <label>Tempo de volta médio (s) *</label>
+          <input type="number" name="default_avg_laptime_sec" min="30" step="0.1" placeholder="Ex: 120" value="${data.default_avg_laptime_sec||''}" required />
+        </div>
+        <div class="form-group">
+          <label>Consumo médio (L/volta) *</label>
+          <input type="number" name="default_avg_fuel_per_lap" min="0.1" step="0.01" placeholder="Ex: 3.2" value="${data.default_avg_fuel_per_lap||''}" required />
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  }
+
+  // Start with 2 teams by default
+  addTeamBlock({ team_name: 'KRT', iracing_car_id: '' });
+  addTeamBlock({ team_name: 'KRT-992', iracing_car_id: '' });
+
+  document.getElementById('create-race-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const feedback = document.getElementById('create-race-feedback');
+
+    const teamBlocks = document.querySelectorAll('#teams-container .team-block');
+    const teams = [...teamBlocks].map(block => ({
+      team_name: block.querySelector('[name=team_name]').value,
+      car_name: block.querySelector('[name=car_name]').value,
+      iracing_car_id: block.querySelector('[name=iracing_car_id]').value,
+      num_drivers: block.querySelector('[name=num_drivers]').value,
+      fuel_capacity_liters: block.querySelector('[name=fuel_capacity_liters]').value,
+      default_avg_laptime_sec: block.querySelector('[name=default_avg_laptime_sec]').value,
+      default_avg_fuel_per_lap: block.querySelector('[name=default_avg_fuel_per_lap]').value,
+    }));
+
+    if (teams.length === 0) { feedback.innerHTML = '<div class="alert alert-error">Adicione ao menos uma equipe.</div>'; return; }
+
+    const payload = {
+      race_name: document.getElementById('r-name').value,
+      race_date: document.getElementById('r-date').value,
+      local_start_time: document.getElementById('r-local-start').value,
+      sim_start_time: document.getElementById('r-sim-start').value,
+      race_duration_hours: document.getElementById('r-duration').value,
+      slot_duration_minutes: document.getElementById('r-slot-dur').value || 60,
+      rain_threshold_pct: document.getElementById('r-rain-thresh').value || 10,
+      team_password: document.getElementById('r-password').value,
+      night_start_sim: document.getElementById('r-night-sim-start').value,
+      night_end_sim: document.getElementById('r-night-sim-end').value,
+      night_start_real: document.getElementById('r-night-real-start').value,
+      night_end_real: document.getElementById('r-night-real-end').value,
+      teams,
+      password: adminPassword,
+    };
+
+    const btn = e.target.querySelector('button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Criando…';
+    try {
+      const result = await API.createRace(payload);
+      feedback.innerHTML = `<div class="alert alert-success">Corrida criada! ID: <code>${result.race_id}</code>. Os timeslots foram gerados automaticamente.</div>`;
+      e.target.reset();
+      races = await loadRaces();
+      populateRaceSelects(races);
+    } catch (err) {
+      feedback.innerHTML = `<div class="alert alert-error">Erro: ${err.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Criar Corrida';
+    }
+  });
+
+  // ============================================================
+  // Helpers
+  // ============================================================
+  function formatDate(val) {
+    if (!val) return '—';
+    try { return new Date(val).toLocaleDateString('pt-BR'); } catch (_) { return String(val); }
+  }
+  function formatDateTime(val) {
+    if (!val) return '—';
+    try { return new Date(val).toLocaleString('pt-BR'); } catch (_) { return String(val); }
+  }
+  function boolIcon(val) {
+    return (val === true || val === 'TRUE' || val === 'true') ? '✅' : '❌';
+  }
+})();
+</script>
+
+</body>
+</html>
